@@ -14,13 +14,13 @@ A lightweight, high-performance VPN client built with Tauri + React + Rust, feat
 [![React](https://img.shields.io/badge/React-18.x-61DAFB.svg)](https://reactjs.org/)
 [![Rust](https://img.shields.io/badge/Rust-1.98+-orange.svg)](https://www.rust-lang.org/)
 
-[Download Latest Release](../../releases/latest) | [Features](#-features) | [Installation](#-installation) | [Documentation](#-usage)
+[Download Latest Release](../../releases/latest) | [Features](#features) | [Installation](#installation) | [Documentation](#usage)
 
 </div>
 
 ---
 
-## 🚀 Features
+## Features
 
 ### Core VPN Capabilities
 - **VLESS Protocol Support** — Modern, high-performance proxy protocol with WebSocket & TLS transport
@@ -45,7 +45,7 @@ A lightweight, high-performance VPN client built with Tauri + React + Rust, feat
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Option 1: MSI Installer (Recommended)
 1. Download `HyperVPN_1.0.0_x64_en-US.msi` from [Releases](../../releases/latest)
@@ -67,7 +67,7 @@ A lightweight, high-performance VPN client built with Tauri + React + Rust, feat
 
 ---
 
-## 🎯 Usage
+## Usage
 
 ### Quick Start
 1. **Import a VLESS Configuration:**
@@ -103,7 +103,7 @@ vless://a1b2c3d4-e5f6-7890-abcd-ef1234567890@example.com:443?type=ws&security=tl
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Frontend
 - **Tauri 2.x** — Rust-powered native application framework
@@ -128,7 +128,7 @@ vless://a1b2c3d4-e5f6-7890-abcd-ef1234567890@example.com:443?type=ws&security=tl
 
 ---
 
-## 🏗️ Building from Source
+## Building from Source
 
 ### Prerequisites
 - **Node.js** 18+ and npm
@@ -162,7 +162,7 @@ npm run tauri dev
 
 ---
 
-## 📊 Performance Benchmarks
+## Performance Benchmarks
 
 | Metric | Development Build | Production Build |
 |--------|-------------------|------------------|
@@ -177,7 +177,7 @@ npm run tauri dev
 
 ---
 
-## 🔒 Security & Privacy
+## Security & Privacy
 
 - **No Telemetry** — Zero data collection or analytics
 - **Local Storage Only** — All configurations stored locally in `AppData\Roaming\com.hypervpn.app`
@@ -187,7 +187,7 @@ npm run tauri dev
 
 ---
 
-## 🐛 Known Issues & Limitations
+## Known Issues & Limitations
 
 - **Windows Only** — macOS and Linux support planned for future releases
 - **VLESS Protocol** — Currently only supports VLESS; VMess/Trojan support coming soon
@@ -196,7 +196,7 @@ npm run tauri dev
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please follow these guidelines:
 
@@ -214,13 +214,13 @@ Contributions are welcome! Please follow these guidelines:
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **[Xray-core](https://github.com/XTLS/Xray-core)** — Proxy engine powering HyperVPN
 - **[Tun2Socks](https://github.com/xjasonlyu/tun2socks)** — User-space TCP/IP stack
@@ -230,7 +230,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ---
 
-## 📧 Support & Contact
+## Support & Contact
 
 - **Issues:** [GitHub Issues](../../issues)
 - **Discussions:** [GitHub Discussions](../../discussions)
@@ -240,8 +240,8 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-**Built with ❤️ using Tauri, React, and Rust**
+**Built with Tauri, React, and Rust**
 
-⭐ **Star this repository if HyperVPN helps you stay connected!** ⭐
+**Star this repository if HyperVPN helps you stay connected!**
 
 </div>
