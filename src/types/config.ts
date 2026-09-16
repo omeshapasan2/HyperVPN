@@ -72,6 +72,26 @@ export interface IspVerifyResult {
   error?: string;
 }
 
+export interface SltVasBundleItem {
+  name: string;
+  packageId?: string;
+  totalData: string;
+  usedData: string;
+  remainingData: string;
+  percentage: number;
+  isEntertainment: boolean;
+  validTill?: string;
+}
+
+export interface UpdateCheckResult {
+  currentVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  releaseNotes: string;
+  downloadUrl: string;
+  publishedAt: string;
+}
+
 export interface LogEntry {
   id: string;
   source: "xray" | "tun2socks" | "system";

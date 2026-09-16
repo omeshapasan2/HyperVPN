@@ -13,6 +13,7 @@ import { useUsage } from "./hooks/useUsage";
 import { useSettings } from "./hooks/useSettings";
 import { useLogs } from "./hooks/useLogs";
 import { VlessConfig } from "./types/config";
+import { ShieldAlert } from "lucide-react";
 
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>("configs");
@@ -41,7 +42,18 @@ export function App() {
   } = useConfigs(handleActiveConfigSwitched);
 
   const { history, resetHistory, refreshHistory } = useUsage();
-  const { settings, binaries, saveSettings, checkBinaries } = useSettings();
+  const {
+    settings,
+    binaries,
+    isElevated,
+    updateInfo,
+    checkingUpdate,
+    updateError,
+    saveSettings,
+    checkBinaries,
+    relaunchAsAdmin,
+    checkForUpdates,
+  } = useSettings();
   const { logs, clearLogs, refreshLogs } = useLogs();
 
   const handleToggle = () => {
@@ -59,6 +71,22 @@ export function App() {
 
       {/* Main Right Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        {/* Administrator Elevation Warning Banner */}
+        {!isElevated && (
+          <div className="bg-zinc-900 border-b border-zinc-800 px-3 py-1.5 flex items-center justify-between text-[11px] text-zinc-300">
+            <div className="flex items-center gap-1.5 truncate">
+              <ShieldAlert className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span>Standard privileges detected. WinTun adapter requires Admin rights.</span>
+            </div>
+            <button
+              onClick={() => relaunchAsAdmin()}
+              className="px-2 py-0.5 bg-white hover:bg-zinc-200 text-black font-bold text-[10px] rounded transition-colors shrink-0 shadow-sm ml-2"
+            >
+              Restart as Admin
+            </button>
+          </div>
+        )}
+
         {/* Top Header with live status, speeds, and connect button */}
         <Header
           status={status}
@@ -104,8 +132,14 @@ export function App() {
             <SettingsTab
               settings={settings}
               binaries={binaries}
+              isElevated={isElevated}
+              updateInfo={updateInfo}
+              checkingUpdate={checkingUpdate}
+              updateError={updateError}
               onSaveSettings={saveSettings}
               onCheckBinaries={checkBinaries}
+              onRelaunchAsAdmin={relaunchAsAdmin}
+              onCheckForUpdates={checkForUpdates}
             />
           )}
 

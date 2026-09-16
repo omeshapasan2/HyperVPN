@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import { VlessConfig } from "../types/config";
 import { formatLatency } from "../utils/formatters";
 import {
   Activity,
-  Check,
   Copy,
   Edit2,
   Trash2,
@@ -19,7 +18,7 @@ interface ConfigCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onPing: () => void;
-  onCopyUri: () => Promise<boolean>;
+  onShowQr: () => void;
 }
 
 export const ConfigCard: React.FC<ConfigCardProps> = ({
@@ -31,19 +30,8 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
   onEdit,
   onDelete,
   onPing,
-  onCopyUri,
+  onShowQr,
 }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const ok = await onCopyUri();
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
   const latencyInfo = formatLatency(config.latency);
 
   return (
@@ -100,11 +88,11 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
             <Activity className={`w-3.5 h-3.5 ${isPinging ? "animate-spin text-white" : ""}`} />
           </button>
           <button
-            onClick={handleCopy}
-            title="Copy vless:// URI"
+            onClick={onShowQr}
+            title="Share & Copy QR / URI"
             className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
+            <Copy className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onEdit}

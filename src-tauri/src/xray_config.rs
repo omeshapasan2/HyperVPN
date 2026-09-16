@@ -239,7 +239,7 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
         }
     }
 
-    // 3. Assemble full Xray config object with Remote DNS and domain sniffing
+    // 3. Assemble full Xray config object with Remote DNS, tuned buffers and domain sniffing
     json!({
         "log": {
             "loglevel": "warning"
@@ -263,6 +263,11 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
         "policy": {
             "levels": {
                 "0": {
+                    "handshake": 4,
+                    "connIdle": 300,
+                    "uplinkOnly": 2,
+                    "downlinkOnly": 5,
+                    "bufferSize": 10240,
                     "statsUserUplink": true,
                     "statsUserDownlink": true
                 }

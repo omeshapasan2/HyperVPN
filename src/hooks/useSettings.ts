@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { AppSettings } from "../types/config";
+import { AppSettings, UpdateCheckResult } from "../types/config";
 
 export interface BinariesStatus {
   xrayFound: boolean;
@@ -42,6 +42,10 @@ export function useSettings() {
     wintunFound: false,
     ready: false,
   });
+  const [isElevated, setIsElevated] = useState<boolean>(true);
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
@@ -52,7 +56,13 @@ export function useSettings() {
         const autostartActive = await isEnabled();
         saved.autoStart = autostartActive;
       } catch {
-        // Plugin might fail in non-packaged dev environment, fallback to saved
+        // Fallback to direct registry check on Windows
+        try {
+          const regActive = await invoke<boolean>("get_windows_autostart");
+          saved.autoStart = regActive;
+        } catch {
+          // Keep saved
+        }
       }
       setSettings(saved);
     } catch (err) {
@@ -71,20 +81,52 @@ export function useSettings() {
     }
   }, []);
 
+  const checkElevation = useCallback(async () => {
+    try {
+      const elevated = await invoke<boolean>("is_elevated");
+      setIsElevated(elevated);
+    } catch (err) {
+      console.error("Failed to check elevation:", err);
+    }
+  }, []);
+
+  const relaunchAsAdmin = useCallback(async () => {
+    try {
+      await invoke("relaunch_as_admin");
+    } catch (err) {
+      console.error("Failed to relaunch as admin:", err);
+    }
+  }, []);
+
+  const checkForUpdates = useCallback(async () => {
+    setCheckingUpdate(true);
+    setUpdateError(null);
+    try {
+      const result = await invoke<UpdateCheckResult>("check_for_updates");
+      setUpdateInfo(result);
+    } catch (err) {
+      const msg = typeof err === "string" ? err : (err as Error).message || "Failed to check for updates";
+      setUpdateError(msg);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }, []);
+
   const saveSettings = useCallback(async (newSettings: AppSettings) => {
     setSettings(newSettings);
     try {
       await invoke("save_app_settings", { settings: newSettings });
 
-      // Handle autostart toggle
+      // Handle autostart toggle via plugin and registry
       try {
         if (newSettings.autoStart) {
           await enable();
         } else {
           await disable();
         }
-      } catch (err) {
-        console.warn("Autostart plugin enable/disable failed:", err);
+      } catch {
+        // Direct registry fallback
+        await invoke("set_windows_autostart", { enabled: newSettings.autoStart }).catch(() => {});
       }
     } catch (err) {
       console.error("Failed to save settings:", err);
@@ -94,14 +136,22 @@ export function useSettings() {
   useEffect(() => {
     fetchSettings();
     checkBinaries();
-  }, [fetchSettings, checkBinaries]);
+    checkElevation();
+  }, [fetchSettings, checkBinaries, checkElevation]);
 
   return {
     settings,
     binaries,
+    isElevated,
+    updateInfo,
+    checkingUpdate,
+    updateError,
     loading,
     saveSettings,
     checkBinaries,
+    checkElevation,
+    relaunchAsAdmin,
+    checkForUpdates,
     refreshSettings: fetchSettings,
   };
 }

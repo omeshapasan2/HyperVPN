@@ -28,33 +28,37 @@ A lightweight, high-performance VPN client built with Tauri + React + Rust, feat
 - **Zero DNS Leaks** — Route-table manipulation ensures all traffic flows through the VPN tunnel
 - **Multi-Server Management** — Import, store, and switch between unlimited VLESS configurations
 - **One-Click Connect** — Instant VPN activation with real-time connection status monitoring
+- **Long-Session UDP Stability** — Tuned connection buffers and UDP timeouts for Discord voice calls and gaming
 
 ### Advanced Features
 - **Real-Time Network Monitor** — Live download/upload speeds, session data usage, and connection uptime
+- **QR Code & Config Sharing** — Instant visual QR code generator and one-click URI clipboard export for mobile scanning
 - **Multi-Stream Speed Test** — Accurate bandwidth measurement using Cloudflare edge network (5 concurrent streams, 10s+ benchmark)
-- **ISP Usage Verification** — Fetch and display real-time data quota from Sri Lanka Telecom API
+- **SLT Add-on Packages & VAS Bundles** — Live breakdown of remaining entertainment and streaming quotas (Netflix, YouTube, Gaming, Social Media)
+- **In-App GitHub Releases Updater** — Automatic check and one-click download for new versions
 - **Latency & Jitter Testing** — Automated ping checks with outlier filtering for accurate RTT measurement
 - **GeoIP Routing** — Automatic rule-based routing using Xray-core with geolocation databases
+- **Single Instance Focus** — Automatically restores and focuses existing window on duplicate launch
 
 ### UI & UX
 - **Compact Portrait Mode** — Minimalist 390×660px window with vertical navigation rail
 - **Monochrome Zinc Theme** — Clean, professional dark UI with subtle gradients
 - **System Tray Integration** — Background operation with tray icon for quick access
 - **Process Log Viewer** — Real-time Xray and Tun2Socks stdout/stderr capture with filtering
-- **Auto-Start Support** — Launch HyperVPN automatically on Windows startup
+- **Auto-Start & Auto-Connect** — Launch and connect automatically on Windows startup
+- **Automatic UAC Elevation** — Embedded PE manifest ensuring kernel routing privileges
 
 ---
 
 ## Installation
 
 ### Option 1: MSI Installer (Recommended)
-1. Download `HyperVPN_1.0.0_x64_en-US.msi` from [Releases](../../releases/latest)
+1. Download `HyperVPN_2.0.0_x64_en-US.msi` from [Releases](../../releases/latest)
 2. Double-click to install
 3. Launch from Start Menu or Desktop shortcut
-4. Grant Administrator permissions when prompted (required for WinTun driver)
 
-### Option 2: NSIS Portable Installer
-1. Download `HyperVPN_1.0.0_x64-setup.exe`
+### Option 2: NSIS Setup Installer
+1. Download `HyperVPN_2.0.0_x64-setup.exe` from [Releases](../../releases/latest)
 2. Run the installer and follow the wizard
 3. Launch `HyperVPN.exe` from the installation directory
 

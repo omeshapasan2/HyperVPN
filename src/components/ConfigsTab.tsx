@@ -3,6 +3,7 @@ import { VlessConfig } from "../types/config";
 import { ConfigCard } from "./ConfigCard";
 import { ConfigEditModal } from "./ConfigEditModal";
 import { ConfigDeleteModal } from "./ConfigDeleteModal";
+import { ConfigQrModal } from "./ConfigQrModal";
 import {
   Plus,
   Search,
@@ -34,7 +35,6 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
   onSelectConfig,
   onSaveConfig,
   onDeleteConfig,
-  onCopyUri,
   onPingConfig,
   onPingAll,
   onAddFromUri,
@@ -49,6 +49,9 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingConfig, setDeletingConfig] = useState<VlessConfig | null>(null);
+
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrConfig, setQrConfig] = useState<VlessConfig | null>(null);
 
   // Filtered configs
   const filteredConfigs = configs.filter((cfg) => {
@@ -86,6 +89,11 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
   const handleOpenDelete = (cfg: VlessConfig) => {
     setDeletingConfig(cfg);
     setIsDeleteModalOpen(true);
+  };
+
+  const handleOpenQr = (cfg: VlessConfig) => {
+    setQrConfig(cfg);
+    setIsQrModalOpen(true);
   };
 
   return (
@@ -179,7 +187,7 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
               onEdit={() => handleOpenEdit(cfg)}
               onDelete={() => handleOpenDelete(cfg)}
               onPing={() => onPingConfig(cfg.id)}
-              onCopyUri={() => onCopyUri(cfg)}
+              onShowQr={() => handleOpenQr(cfg)}
             />
           ))}
         </div>
@@ -200,6 +208,16 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
         isConnected={isConnected}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={() => deletingConfig && onDeleteConfig(deletingConfig.id)}
+      />
+
+      {/* QR Code & Share Modal (Loaded on Demand) */}
+      <ConfigQrModal
+        isOpen={isQrModalOpen}
+        config={qrConfig}
+        onClose={() => {
+          setIsQrModalOpen(false);
+          setQrConfig(null);
+        }}
       />
     </div>
   );

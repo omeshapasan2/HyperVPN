@@ -97,7 +97,7 @@ impl ProcessManager {
         self.logs.lock().unwrap().iter().cloned().collect()
     }
 
-    /// Finds the path to a sidecar binary (e.g. "xray.exe", "tun2socks.exe", "wintun.dll")
+    /// Finds the path to a sidecar binary (e.g. "xray.exe", "tun2socks.exe", "wintun.dll", "WebView2Loader.dll")
     pub fn find_binary_path(&self, binary_name: &str) -> Option<PathBuf> {
         // Check alongside current executable
         if let Ok(current_exe) = std::env::current_exe() {
@@ -117,6 +117,7 @@ impl ProcessManager {
         let dev_paths = [
             PathBuf::from(format!("src-tauri/binaries/{}", binary_name)),
             PathBuf::from(format!("binaries/{}", binary_name)),
+            PathBuf::from(format!("src-tauri/{}", binary_name)),
             PathBuf::from(binary_name),
         ];
         for path in &dev_paths {
@@ -248,6 +249,13 @@ impl ProcessManager {
             &format!("socks5://127.0.0.1:{}", socks_port),
             "--loglevel",
             "warning",
+            "--udp-timeout",
+            "5m",
+            "--tcp-auto-tuning",
+            "--tcp-sndbuf",
+            "2m",
+            "--tcp-rcvbuf",
+            "2m",
         ]);
         tun_cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 

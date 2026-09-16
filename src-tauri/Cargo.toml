@@ -1,6 +1,6 @@
 [package]
 name = "hypervpn"
-version = "1.0.0"
+version = "2.0.0"
 description = "HyperVPN - Fast, native VLESS desktop VPN client for Windows"
 authors = ["HyperVPN Team"]
 edition = "2021"
@@ -18,6 +18,7 @@ tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
 tauri-plugin-store = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

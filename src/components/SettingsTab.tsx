@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { AppSettings } from "../types/config";
+import { AppSettings, UpdateCheckResult } from "../types/config";
 import { BinariesStatus } from "../hooks/useSettings";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   CheckCircle2,
   XCircle,
@@ -8,20 +9,37 @@ import {
   RotateCw,
   Plus,
   Trash2,
+  ShieldAlert,
+  ShieldCheck,
+  Download,
+  ExternalLink,
+  Sparkles,
 } from "lucide-react";
 
 interface SettingsTabProps {
   settings: AppSettings;
   binaries: BinariesStatus;
+  isElevated: boolean;
+  updateInfo: UpdateCheckResult | null;
+  checkingUpdate: boolean;
+  updateError: string | null;
   onSaveSettings: (settings: AppSettings) => Promise<void>;
   onCheckBinaries: () => Promise<void>;
+  onRelaunchAsAdmin: () => Promise<void>;
+  onCheckForUpdates: () => Promise<void>;
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   settings,
   binaries,
+  isElevated,
+  updateInfo,
+  checkingUpdate,
+  updateError,
   onSaveSettings,
   onCheckBinaries,
+  onRelaunchAsAdmin,
+  onCheckForUpdates,
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [newExclusion, setNewExclusion] = useState("");
@@ -51,6 +69,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setFormData({ ...formData, customLanExclusions: updated });
   };
 
+  const handleOpenDownload = async (url: string) => {
+    try {
+      await openUrl(url);
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col p-3.5 overflow-y-auto space-y-3 select-none">
       {/* Tab Header */}
@@ -67,6 +93,120 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <Save className="w-3 h-3" />
           {isSaved ? "Saved" : "Save"}
         </button>
+      </div>
+
+      {/* Administrator Elevation Status Card */}
+      <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 space-y-2">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
+          <span className="text-[11px] font-bold text-zinc-300">
+            Privileges & Security
+          </span>
+          {isElevated ? (
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-zinc-300">
+              <ShieldCheck className="w-3 h-3 text-white" /> Elevated (Admin)
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400">
+              <ShieldAlert className="w-3 h-3 text-zinc-400" /> Standard User
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between text-xs pt-0.5">
+          <p className="text-[10px] text-zinc-400 max-w-[230px]">
+            {isElevated
+              ? "HyperVPN has full administrator privileges to manage the WinTun kernel adapter and route tables."
+              : "Administrator privileges are required for kernel packet injection."}
+          </p>
+          {!isElevated && (
+            <button
+              type="button"
+              onClick={() => onRelaunchAsAdmin()}
+              className="px-2.5 py-1 bg-white hover:bg-zinc-200 text-black text-[10px] font-bold rounded-lg transition-colors shrink-0 shadow-sm"
+            >
+              Restart as Admin
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* In-App GitHub Releases Updater Card */}
+      <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 space-y-2.5">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
+            <span className="text-[11px] font-bold text-zinc-300">
+              Software Updates
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onCheckForUpdates()}
+            disabled={checkingUpdate}
+            className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 hover:text-white text-[10px] font-medium rounded-md transition-colors flex items-center gap-1 border border-zinc-700"
+          >
+            <RotateCw className={`w-2.5 h-2.5 ${checkingUpdate ? "animate-spin" : ""}`} />
+            {checkingUpdate ? "Checking..." : "Check Updates"}
+          </button>
+        </div>
+
+        <div className="space-y-1.5 text-xs">
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-zinc-400">Current Installed Version</span>
+            <span className="font-mono font-bold text-zinc-200">
+              v{updateInfo?.currentVersion || "1.0.0"}
+            </span>
+          </div>
+
+          {updateError && (
+            <div className="p-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-400">
+              {updateError}
+            </div>
+          )}
+
+          {updateInfo && !checkingUpdate && (
+            <div className="mt-2 pt-2 border-t border-zinc-800/60 space-y-2">
+              {updateInfo.hasUpdate ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-white flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-white" />
+                      New Version Available: v{updateInfo.latestVersion}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDownload(updateInfo.downloadUrl)}
+                      className="px-2.5 py-1 bg-white hover:bg-zinc-200 text-black text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                    >
+                      <Download className="w-3 h-3" />
+                      Get Update
+                    </button>
+                  </div>
+
+                  {updateInfo.releaseNotes && (
+                    <div className="p-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-400 max-h-24 overflow-y-auto font-mono whitespace-pre-wrap">
+                      {updateInfo.releaseNotes}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-white" />
+                    You are running the latest version.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDownload(updateInfo.downloadUrl)}
+                    className="text-zinc-500 hover:text-zinc-300 flex items-center gap-0.5"
+                  >
+                    Releases <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <form id="settings-form" onSubmit={handleSave} className="space-y-3">

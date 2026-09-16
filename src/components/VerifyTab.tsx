@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { AppSettings, IspVerifyResult } from "../types/config";
+import { AppSettings, IspVerifyResult, SltVasBundleItem } from "../types/config";
 import { invoke } from "@tauri-apps/api/core";
 import {
   CheckCircle2,
@@ -9,6 +9,10 @@ import {
   Timer,
   Save,
   ArrowRight,
+  Package,
+  Film,
+  RefreshCw,
+  Layers,
 } from "lucide-react";
 
 interface VerifyTabProps {
@@ -31,6 +35,11 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
 
   // Cooldown countdown timer
   const [cooldownRemaining, setCooldownRemaining] = useState(120);
+
+  // SLT VAS Add-on Bundles state
+  const [vasBundles, setVasBundles] = useState<SltVasBundleItem[]>([]);
+  const [loadingVas, setLoadingVas] = useState(false);
+  const [vasError, setVasError] = useState<string | null>(null);
 
   useEffect(() => {
     setSltCredentials(settings.slt);
@@ -80,6 +89,30 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
           selectedUsageTypeIndex: dialogCredentials.selectedUsageTypeIndex || 0,
         },
       });
+    }
+  };
+
+  const handleFetchVasBundles = async () => {
+    if (!sltCredentials.subscriberId || !sltCredentials.token) {
+      setVasError("Enter SLT Subscriber ID and Token above first");
+      return;
+    }
+    setLoadingVas(true);
+    setVasError(null);
+    try {
+      const bundles = await invoke<SltVasBundleItem[]>("get_slt_vas_bundles", {
+        creds: {
+          subscriberId: sltCredentials.subscriberId.trim(),
+          token: sltCredentials.token.trim(),
+          clientId: (sltCredentials.clientId || "").trim(),
+        },
+      });
+      setVasBundles(bundles);
+    } catch (err) {
+      const msg = typeof err === "string" ? err : (err as Error).message || "Failed to load SLT add-on bundles";
+      setVasError(msg);
+    } finally {
+      setLoadingVas(false);
     }
   };
 
@@ -272,6 +305,104 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
           </button>
         </div>
       </div>
+
+      {/* SLT Add-on Packages & Entertainment Bundles Card (When SLT is active) */}
+      {selectedIsp === "slt" && (
+        <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 space-y-2.5">
+          <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-zinc-300" />
+              <span className="text-[11px] font-bold text-zinc-300">
+                SLT Add-on & Entertainment Bundles
+              </span>
+            </div>
+            <button
+              onClick={handleFetchVasBundles}
+              disabled={loadingVas || !sltCredentials.subscriberId || !sltCredentials.token}
+              className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 hover:text-white text-[10px] font-medium rounded-md transition-colors flex items-center gap-1 border border-zinc-700"
+            >
+              <RefreshCw className={`w-2.5 h-2.5 ${loadingVas ? "animate-spin" : ""}`} />
+              {loadingVas ? "Fetching..." : "Fetch Add-ons"}
+            </button>
+          </div>
+
+          {vasError && (
+            <div className="p-2 bg-zinc-950/80 border border-zinc-800 rounded-lg text-[10px] text-zinc-400 flex items-center gap-1.5">
+              <AlertTriangle className="w-3 h-3 text-zinc-500 shrink-0" />
+              <span className="truncate">{vasError}</span>
+            </div>
+          )}
+
+          {loadingVas && (
+            <div className="text-center py-4 space-y-1.5">
+              <div className="w-5 h-5 border-2 border-zinc-500 border-t-white rounded-full animate-spin mx-auto" />
+              <p className="text-[10px] text-zinc-500 font-medium">
+                Querying SLT GetDashboardVASBundles API...
+              </p>
+            </div>
+          )}
+
+          {!loadingVas && vasBundles.length > 0 && (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
+              {vasBundles.map((bundle, idx) => (
+                <div
+                  key={idx}
+                  className="bg-zinc-950/80 border border-zinc-800/80 rounded-lg p-2.5 space-y-1.5 hover:border-zinc-700 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                      {bundle.isEntertainment ? (
+                        <span className="px-1.5 py-0.5 bg-zinc-800 text-white border border-zinc-600 rounded text-[9px] font-bold flex items-center gap-1 shrink-0">
+                          <Film className="w-2.5 h-2.5 text-zinc-300" />
+                          Streaming
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 bg-zinc-900 text-zinc-400 border border-zinc-800 rounded text-[9px] font-medium flex items-center gap-1 shrink-0">
+                          <Layers className="w-2.5 h-2.5 text-zinc-500" />
+                          Add-on
+                        </span>
+                      )}
+                      <span className="text-[11px] font-bold text-white truncate" title={bundle.name}>
+                        {bundle.name}
+                      </span>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[11px] font-mono font-bold text-zinc-200">
+                        {bundle.remainingData}
+                      </span>
+                      <span className="text-[9px] text-zinc-500 block">remaining</span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        bundle.isEntertainment ? "bg-white" : "bg-zinc-400"
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, bundle.percentage))}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[9px] font-mono text-zinc-500 pt-0.5">
+                    <span>Used: {bundle.usedData} / {bundle.totalData}</span>
+                    {bundle.validTill && (
+                      <span className="text-[9px] text-zinc-500">Exp: {bundle.validTill}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loadingVas && vasBundles.length === 0 && !vasError && (
+            <p className="text-[10px] text-zinc-500 text-center py-2">
+              Click &quot;Fetch Add-ons&quot; to view active streaming packs and data bundles.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Error Message */}
       {errorMsg && (

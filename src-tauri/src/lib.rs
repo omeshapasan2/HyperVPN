@@ -8,7 +8,10 @@ pub mod tray;
 pub mod vless;
 pub mod xray_config;
 
-use isp::{query_dialog_usage, query_slt_usage, DialogCredentials, IspVerificationResponse, SltCredentials};
+use isp::{
+    query_dialog_usage, query_slt_usage, query_slt_vas_bundles, DialogCredentials,
+    IspVerificationResponse, SltCredentials, SltVasBundleItem,
+};
 use ping::{measure_tcp_ping, PingResult};
 use process::{ProcessLogEntry, ProcessManager};
 use serde::{Deserialize, Serialize};
@@ -43,6 +46,17 @@ pub struct BinariesStatus {
     pub wintun_found: bool,
     pub wintun_path: Option<String>,
     pub ready: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCheckResult {
+    pub current_version: String,
+    pub latest_version: String,
+    pub has_update: bool,
+    pub release_notes: String,
+    pub download_url: String,
+    pub published_at: String,
 }
 
 pub struct AppState {
@@ -138,6 +152,11 @@ async fn verify_isp_slt(creds: SltCredentials) -> Result<IspVerificationResponse
 }
 
 #[tauri::command]
+async fn get_slt_vas_bundles(creds: SltCredentials) -> Result<Vec<SltVasBundleItem>, String> {
+    query_slt_vas_bundles(creds).await
+}
+
+#[tauri::command]
 async fn verify_isp_dialog(creds: DialogCredentials) -> Result<IspVerificationResponse, String> {
     query_dialog_usage(creds).await
 }
@@ -168,6 +187,221 @@ fn check_binaries_status(state: State<'_, AppState>) -> Result<BinariesStatus, S
     })
 }
 
+#[tauri::command]
+fn is_elevated() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let output = std::process::Command::new("net")
+            .arg("session")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        match output {
+            Ok(out) => out.status.success(),
+            Err(_) => false,
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        true
+    }
+}
+
+#[tauri::command]
+fn relaunch_as_admin() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe_str = current_exe.to_string_lossy().to_string();
+        let _ = std::process::Command::new("powershell")
+            .args(&[
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &format!("Start-Process -FilePath '{}' -Verb RunAs", exe_str),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| format!("Failed to launch elevated process: {}", e))?;
+        std::process::exit(0);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn set_windows_autostart(enabled: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe_str = exe.to_string_lossy().to_string();
+
+        if enabled {
+            let val = format!("\"{}\" --autostart", exe_str);
+            let _ = std::process::Command::new("reg")
+                .args(&[
+                    "add",
+                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                    "/v",
+                    "HyperVPN",
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    &val,
+                    "/f",
+                ])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output()
+                .map_err(|e| format!("Failed to set autostart registry: {}", e))?;
+        } else {
+            let _ = std::process::Command::new("reg")
+                .args(&[
+                    "delete",
+                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                    "/v",
+                    "HyperVPN",
+                    "/f",
+                ])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn get_windows_autostart() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let output = std::process::Command::new("reg")
+            .args(&[
+                "query",
+                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                "HyperVPN",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        if let Ok(out) = output {
+            return Ok(out.status.success());
+        }
+    }
+    Ok(false)
+}
+
+#[tauri::command]
+async fn check_for_updates() -> Result<UpdateCheckResult, String> {
+    let current_version = env!("CARGO_PKG_VERSION").to_string();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .user_agent("HyperVPN-Desktop-Client")
+        .build()
+        .map_err(|e| format!("Client error: {}", e))?;
+
+    let res = client
+        .get("https://api.github.com/repos/omeshapasan2/HyperVPN/releases/latest")
+        .header("Accept", "application/vnd.github.v3+json")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to GitHub releases: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("GitHub API returned HTTP {}", res.status()));
+    }
+
+    let json_val: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse release JSON: {}", e))?;
+
+    let tag_name = json_val
+        .get("tag_name")
+        .and_then(|t| t.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let latest_version = tag_name.trim_start_matches('v').trim().to_string();
+    let release_notes = json_val
+        .get("body")
+        .and_then(|b| b.as_str())
+        .unwrap_or("")
+        .to_string();
+    let published_at = json_val
+        .get("published_at")
+        .and_then(|p| p.as_str())
+        .unwrap_or("")
+        .to_string();
+    let html_url = json_val
+        .get("html_url")
+        .and_then(|u| u.as_str())
+        .unwrap_or("https://github.com/omeshapasan2/HyperVPN/releases/latest")
+        .to_string();
+
+    let mut download_url = html_url.clone();
+    if let Some(assets) = json_val.get("assets").and_then(|a| a.as_array()) {
+        for asset in assets {
+            let name = asset
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("")
+                .to_lowercase();
+            if name.ends_with(".msi") || name.ends_with(".exe") {
+                if let Some(asset_url) = asset.get("browser_download_url").and_then(|u| u.as_str()) {
+                    download_url = asset_url.to_string();
+                    break;
+                }
+            }
+        }
+    }
+
+    let has_update = is_newer_version(&latest_version, &current_version);
+
+    Ok(UpdateCheckResult {
+        current_version,
+        latest_version,
+        has_update,
+        release_notes,
+        download_url,
+        published_at,
+    })
+}
+
+fn is_newer_version(latest: &str, current: &str) -> bool {
+    let parse_ver = |v: &str| -> Vec<u32> {
+        v.split('.')
+            .filter_map(|p| {
+                p.chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect::<String>()
+                    .parse::<u32>()
+                    .ok()
+            })
+            .collect()
+    };
+
+    let l_parts = parse_ver(latest);
+    let c_parts = parse_ver(current);
+
+    for (l, c) in l_parts.iter().zip(c_parts.iter()) {
+        if l > c {
+            return true;
+        } else if l < c {
+            return false;
+        }
+    }
+    l_parts.len() > c_parts.len()
+}
+
 // ---------------------------------------------------------------------------
 // App Entry
 // ---------------------------------------------------------------------------
@@ -192,6 +426,13 @@ pub fn run() {
     let sm_clone = Arc::clone(&storage_mgr);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = app.get_webview_window("main").map(|w| {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            });
+        }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::default(),
             Some(vec!["--autostart"]),
@@ -280,9 +521,15 @@ pub fn run() {
             reset_usage_history,
             ping_config,
             verify_isp_slt,
+            get_slt_vas_bundles,
             verify_isp_dialog,
             get_system_logs,
             check_binaries_status,
+            is_elevated,
+            relaunch_as_admin,
+            set_windows_autostart,
+            get_windows_autostart,
+            check_for_updates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running HyperVPN");
