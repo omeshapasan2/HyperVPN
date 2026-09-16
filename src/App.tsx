@@ -3,6 +3,7 @@ import { Header } from "./components/Header";
 import { Navigation, TabType } from "./components/Navigation";
 import { ConfigsTab } from "./components/ConfigsTab";
 import { UsageTab } from "./components/UsageTab";
+import { SpeedTestTab } from "./components/SpeedTestTab";
 import { VerifyTab } from "./components/VerifyTab";
 import { SettingsTab } from "./components/SettingsTab";
 import { LogsViewer } from "./components/LogsViewer";
@@ -92,6 +93,8 @@ export function App() {
               onRefreshHistory={refreshHistory}
             />
           )}
+
+          {activeTab === "speed" && <SpeedTestTab />}
 
           {activeTab === "verify" && (
             <VerifyTab settings={settings} onSaveSettings={saveSettings} />

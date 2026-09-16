@@ -1,7 +1,7 @@
 import React from "react";
-import { Server, BarChart3, ShieldCheck, Sliders, Terminal } from "lucide-react";
+import { Server, BarChart3, Gauge, ShieldCheck, Sliders, Terminal } from "lucide-react";
 
-export type TabType = "configs" | "usage" | "verify" | "settings" | "logs";
+export type TabType = "configs" | "usage" | "speed" | "verify" | "settings" | "logs";
 
 interface NavigationProps {
   activeTab: TabType;
@@ -12,6 +12,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
   const tabs = [
     { id: "configs" as TabType, label: "Servers", icon: Server },
     { id: "usage" as TabType, label: "Usage", icon: BarChart3 },
+    { id: "speed" as TabType, label: "Speed", icon: Gauge },
     { id: "verify" as TabType, label: "Verify", icon: ShieldCheck },
     { id: "settings" as TabType, label: "Settings", icon: Sliders },
     { id: "logs" as TabType, label: "Logs", icon: Terminal },
