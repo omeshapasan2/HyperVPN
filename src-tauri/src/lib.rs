@@ -9,8 +9,8 @@ pub mod vless;
 pub mod xray_config;
 
 use isp::{
-    query_dialog_usage, query_slt_usage, query_slt_vas_bundles, DialogCredentials,
-    IspVerificationResponse, SltCredentials, SltVasBundleItem,
+    query_dialog_usage, query_slt_full_usage, query_slt_usage, query_slt_vas_bundles,
+    DialogCredentials, IspVerificationResponse, SltCredentials, SltUsageResponse, SltVasBundleItem,
 };
 use ping::{measure_tcp_ping, PingResult};
 use process::{ProcessLogEntry, ProcessManager};
@@ -154,6 +154,11 @@ async fn verify_isp_slt(creds: SltCredentials) -> Result<IspVerificationResponse
 #[tauri::command]
 async fn get_slt_vas_bundles(creds: SltCredentials) -> Result<Vec<SltVasBundleItem>, String> {
     query_slt_vas_bundles(creds).await
+}
+
+#[tauri::command]
+async fn get_slt_full_usage(creds: SltCredentials) -> Result<SltUsageResponse, String> {
+    query_slt_full_usage(creds).await
 }
 
 #[tauri::command]
@@ -522,6 +527,7 @@ pub fn run() {
             ping_config,
             verify_isp_slt,
             get_slt_vas_bundles,
+            get_slt_full_usage,
             verify_isp_dialog,
             get_system_logs,
             check_binaries_status,

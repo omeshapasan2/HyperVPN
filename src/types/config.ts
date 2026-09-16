@@ -83,6 +83,46 @@ export interface SltVasBundleItem {
   validTill?: string;
 }
 
+export interface SltPackageUsageDetail {
+  name: string;
+  limit: string;
+  used: string;
+  remaining: string;
+  volumeUnit: string;
+  percentage: number;
+  expiryDate?: string;
+}
+
+export interface SltPrimaryPackageData {
+  packageName: string;
+  status?: string;
+  reportedTime?: string;
+  usageDetails: SltPackageUsageDetail[];
+  totalLimit: string;
+  totalUsed: string;
+  totalRemaining: string;
+  volumeUnit: string;
+}
+
+export interface SltVasBundleData {
+  name: string;
+  used: string;
+  limit?: string;
+  remaining?: string;
+  volumeUnit: string;
+  percentage: number;
+  expiryDate?: string;
+  subscriptionId?: string;
+  isEntertainment: boolean;
+}
+
+export interface SltUsageResponse {
+  primaryPackage?: SltPrimaryPackageData;
+  vasBundles: SltVasBundleData[];
+  reportedTime?: string;
+  status?: string;
+}
+
 export interface UpdateCheckResult {
   currentVersion: string;
   latestVersion: string;

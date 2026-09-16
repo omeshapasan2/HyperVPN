@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { AppSettings, IspVerifyResult, SltVasBundleItem } from "../types/config";
+import { AppSettings, IspVerifyResult, SltUsageResponse } from "../types/config";
 import { invoke } from "@tauri-apps/api/core";
 import {
   CheckCircle2,
@@ -36,10 +36,10 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
   // Cooldown countdown timer
   const [cooldownRemaining, setCooldownRemaining] = useState(120);
 
-  // SLT VAS Add-on Bundles state
-  const [vasBundles, setVasBundles] = useState<SltVasBundleItem[]>([]);
-  const [loadingVas, setLoadingVas] = useState(false);
-  const [vasError, setVasError] = useState<string | null>(null);
+  // SLT Usage card state (combines Primary Package & VAS / Entertainment Bundles)
+  const [sltUsage, setSltUsage] = useState<SltUsageResponse | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
 
   useEffect(() => {
     setSltCredentials(settings.slt);
@@ -92,27 +92,27 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
     }
   };
 
-  const handleFetchVasBundles = async () => {
+  const handleFetchSltUsage = async () => {
     if (!sltCredentials.subscriberId || !sltCredentials.token) {
-      setVasError("Enter SLT Subscriber ID and Token above first");
+      setUsageError("Enter SLT Subscriber ID and Token above first");
       return;
     }
-    setLoadingVas(true);
-    setVasError(null);
+    setLoadingUsage(true);
+    setUsageError(null);
     try {
-      const bundles = await invoke<SltVasBundleItem[]>("get_slt_vas_bundles", {
+      const res = await invoke<SltUsageResponse>("get_slt_full_usage", {
         creds: {
           subscriberId: sltCredentials.subscriberId.trim(),
           token: sltCredentials.token.trim(),
           clientId: (sltCredentials.clientId || "").trim(),
         },
       });
-      setVasBundles(bundles);
+      setSltUsage(res);
     } catch (err) {
-      const msg = typeof err === "string" ? err : (err as Error).message || "Failed to load SLT add-on bundles";
-      setVasError(msg);
+      const msg = typeof err === "string" ? err : (err as Error).message || "Failed to load SLT usage data";
+      setUsageError(msg);
     } finally {
-      setLoadingVas(false);
+      setLoadingUsage(false);
     }
   };
 
@@ -306,99 +306,207 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
         </div>
       </div>
 
-      {/* SLT Add-on Packages & Entertainment Bundles Card (When SLT is active) */}
+      {/* Redesigned SLT Usage Card (When SLT is active) */}
       {selectedIsp === "slt" && (
         <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 space-y-2.5">
           <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
             <div className="flex items-center gap-1.5">
               <Package className="w-3.5 h-3.5 text-zinc-300" />
               <span className="text-[11px] font-bold text-zinc-300">
-                SLT Add-on & Entertainment Bundles
+                SLT Usage
               </span>
             </div>
             <button
-              onClick={handleFetchVasBundles}
-              disabled={loadingVas || !sltCredentials.subscriberId || !sltCredentials.token}
+              onClick={handleFetchSltUsage}
+              disabled={loadingUsage || !sltCredentials.subscriberId || !sltCredentials.token}
               className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 hover:text-white text-[10px] font-medium rounded-md transition-colors flex items-center gap-1 border border-zinc-700"
             >
-              <RefreshCw className={`w-2.5 h-2.5 ${loadingVas ? "animate-spin" : ""}`} />
-              {loadingVas ? "Fetching..." : "Fetch Add-ons"}
+              <RefreshCw className={`w-2.5 h-2.5 ${loadingUsage ? "animate-spin" : ""}`} />
+              {loadingUsage ? "Fetching..." : "Fetch Usage"}
             </button>
           </div>
 
-          {vasError && (
+          {usageError && (
             <div className="p-2 bg-zinc-950/80 border border-zinc-800 rounded-lg text-[10px] text-zinc-400 flex items-center gap-1.5">
               <AlertTriangle className="w-3 h-3 text-zinc-500 shrink-0" />
-              <span className="truncate">{vasError}</span>
+              <span className="truncate">{usageError}</span>
             </div>
           )}
 
-          {loadingVas && (
+          {loadingUsage && (
             <div className="text-center py-4 space-y-1.5">
               <div className="w-5 h-5 border-2 border-zinc-500 border-t-white rounded-full animate-spin mx-auto" />
               <p className="text-[10px] text-zinc-500 font-medium">
-                Querying SLT GetDashboardVASBundles API...
+                Querying SLT Usage &amp; VAS APIs...
               </p>
             </div>
           )}
 
-          {!loadingVas && vasBundles.length > 0 && (
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
-              {vasBundles.map((bundle, idx) => (
-                <div
-                  key={idx}
-                  className="bg-zinc-950/80 border border-zinc-800/80 rounded-lg p-2.5 space-y-1.5 hover:border-zinc-700 transition-colors"
-                >
+          {!loadingUsage && sltUsage && (
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-0.5">
+              {/* Reported Time & Status Header */}
+              {(sltUsage.status || sltUsage.reportedTime) && (
+                <div className="flex items-center justify-between px-2 py-1 bg-zinc-950/60 rounded-md border border-zinc-800/60 text-[9px] text-zinc-400 font-mono">
+                  <span>
+                    Status:{" "}
+                    <span className={sltUsage.status === "THROTTLED" ? "text-amber-400 font-bold" : "text-zinc-200 font-bold"}>
+                      {sltUsage.status || "ACTIVE"}
+                    </span>
+                  </span>
+                  {sltUsage.reportedTime && (
+                    <span className="text-zinc-500">As of: {sltUsage.reportedTime}</span>
+                  )}
+                </div>
+              )}
+
+              {/* 1. Primary Package Info (from UsageSummary API 1) */}
+              {sltUsage.primaryPackage && (
+                <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-lg p-2.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                      {bundle.isEntertainment ? (
-                        <span className="px-1.5 py-0.5 bg-zinc-800 text-white border border-zinc-600 rounded text-[9px] font-bold flex items-center gap-1 shrink-0">
-                          <Film className="w-2.5 h-2.5 text-zinc-300" />
-                          Streaming
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 bg-zinc-900 text-zinc-400 border border-zinc-800 rounded text-[9px] font-medium flex items-center gap-1 shrink-0">
-                          <Layers className="w-2.5 h-2.5 text-zinc-500" />
-                          Add-on
-                        </span>
-                      )}
-                      <span className="text-[11px] font-bold text-white truncate" title={bundle.name}>
-                        {bundle.name}
+                      <span className="px-1.5 py-0.5 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded text-[9px] font-bold shrink-0">
+                        Base
+                      </span>
+                      <span className="text-[11px] font-bold text-white truncate" title={sltUsage.primaryPackage.packageName}>
+                        {sltUsage.primaryPackage.packageName}
                       </span>
                     </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="text-[11px] font-mono font-bold text-zinc-200">
-                        {bundle.remainingData}
+                    {sltUsage.primaryPackage.usageDetails[0]?.expiryDate && (
+                      <span className="text-[9px] text-zinc-500 font-mono shrink-0">
+                        Exp: {sltUsage.primaryPackage.usageDetails[0].expiryDate}
                       </span>
-                      <span className="text-[9px] text-zinc-500 block">remaining</span>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-500 ${
-                        bundle.isEntertainment ? "bg-white" : "bg-zinc-400"
-                      }`}
-                      style={{ width: `${Math.min(100, Math.max(0, bundle.percentage))}%` }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between text-[9px] font-mono text-zinc-500 pt-0.5">
-                    <span>Used: {bundle.usedData} / {bundle.totalData}</span>
-                    {bundle.validTill && (
-                      <span className="text-[9px] text-zinc-500">Exp: {bundle.validTill}</span>
                     )}
                   </div>
+
+                  {/* Primary Package Consumption */}
+                  {sltUsage.primaryPackage.usageDetails.length > 0 ? (
+                    sltUsage.primaryPackage.usageDetails.map((detail, idx) => (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-mono">
+                          <span className="text-zinc-200 font-semibold">
+                            {detail.used} / {detail.limit} {detail.volumeUnit}
+                          </span>
+                          <span className="text-zinc-400">
+                            remaining -{" "}
+                            <span className="text-white font-bold">
+                              {detail.remaining} {detail.volumeUnit}
+                            </span>
+                          </span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-full bg-white transition-all duration-500"
+                            style={{
+                              width: `${Math.min(100, Math.max(0, detail.percentage))}%`,
+                            }}
+                          />
+                        </div>
+
+                        {detail.name && (
+                          <div className="flex items-center justify-between text-[9px] text-zinc-500 pt-0.5">
+                            <span>{detail.name}</span>
+                            <span>{detail.percentage.toFixed(1)}% consumed</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-zinc-200 font-semibold">
+                          {sltUsage.primaryPackage.totalUsed} / {sltUsage.primaryPackage.totalLimit} {sltUsage.primaryPackage.volumeUnit}
+                        </span>
+                        <span className="text-zinc-400">
+                          remaining -{" "}
+                          <span className="text-white font-bold">
+                            {sltUsage.primaryPackage.totalRemaining} {sltUsage.primaryPackage.volumeUnit}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
+
+              {/* 2. VAS & Entertainment Bundles (from GetDashboardVASBundles API 2) */}
+              {sltUsage.vasBundles && sltUsage.vasBundles.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-0.5 pt-0.5">
+                    VAS &amp; Entertainment Add-ons
+                  </div>
+                  {sltUsage.vasBundles.map((bundle, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-zinc-950/80 border border-zinc-800/80 rounded-lg p-2.5 space-y-1.5 hover:border-zinc-700 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                          {bundle.isEntertainment ? (
+                            <span className="px-1.5 py-0.5 bg-zinc-800 text-white border border-zinc-600 rounded text-[9px] font-bold flex items-center gap-1 shrink-0">
+                              <Film className="w-2.5 h-2.5 text-zinc-300" />
+                              Streaming
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 bg-zinc-900 text-zinc-400 border border-zinc-800 rounded text-[9px] font-medium flex items-center gap-1 shrink-0">
+                              <Layers className="w-2.5 h-2.5 text-zinc-500" />
+                              Add-on
+                            </span>
+                          )}
+                          <span className="text-[11px] font-bold text-white truncate" title={bundle.name}>
+                            {bundle.name}
+                          </span>
+                        </div>
+
+                        {bundle.expiryDate && (
+                          <span className="text-[9px] text-zinc-500 font-mono shrink-0">
+                            Exp: {bundle.expiryDate}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Display format: If limit is null/unlimited (like Entertainment Combo Pack), show name -> used GB Used */}
+                      {bundle.limit ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-mono">
+                            <span className="text-zinc-200">
+                              {bundle.used} / {bundle.limit} {bundle.volumeUnit}
+                            </span>
+                            <span className="text-zinc-400">
+                              remaining -{" "}
+                              <span className="text-white font-bold">
+                                {bundle.remaining || "0.0"} {bundle.volumeUnit}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className={`h-full transition-all duration-500 ${
+                                bundle.isEntertainment ? "bg-white" : "bg-zinc-400"
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(0, bundle.percentage))}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between bg-zinc-900/60 px-2 py-1 rounded-md border border-zinc-800/60 font-mono text-[11px]">
+                          <span className="text-zinc-400 text-[10px]">{bundle.name}</span>
+                          <span className="text-white font-bold">
+                            {bundle.used} {bundle.volumeUnit} Used
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {!loadingVas && vasBundles.length === 0 && !vasError && (
+          {!loadingUsage && !sltUsage && !usageError && (
             <p className="text-[10px] text-zinc-500 text-center py-2">
-              Click &quot;Fetch Add-ons&quot; to view active streaming packs and data bundles.
+              Click &quot;Fetch Usage&quot; to view primary package allowance and active entertainment add-ons.
             </p>
           )}
         </div>
