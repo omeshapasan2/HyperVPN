@@ -6,12 +6,18 @@ export interface SpeedTestState {
   phase: SpeedTestPhase;
   ping: number | null; // ms
   jitter: number | null; // ms
-  downloadSpeed: number | null; // Mbps
-  currentDownloadSpeed: number; // live Mbps
-  uploadSpeed: number | null; // Mbps
-  currentUploadSpeed: number; // live Mbps
+  downloadSpeed: number | null; // final Mbps
+  currentDownloadSpeed: number; // live smoothed Mbps
+  uploadSpeed: number | null; // final Mbps
+  currentUploadSpeed: number; // live smoothed Mbps
   progress: number; // 0 - 100
   errorMessage: string | null;
+}
+
+// Rolling sample window for accurate throughput calculation
+interface ByteSample {
+  timestamp: number;
+  bytes: number;
 }
 
 export function useSpeedTest() {
@@ -78,192 +84,292 @@ export function useSpeedTest() {
       currentDownloadSpeed: 0,
       uploadSpeed: null,
       currentUploadSpeed: 0,
-      progress: 5,
+      progress: 2,
       errorMessage: null,
     });
 
     try {
-      // ==========================================
-      // PHASE 1: PING & JITTER TEST (5 iterations)
-      // ==========================================
+      // ==============================================================
+      // PHASE 1: LATENCY & JITTER BENCHMARK (8 sequential samples)
+      // ==============================================================
       const pingSamples: number[] = [];
-      const PING_COUNT = 5;
+      const PING_COUNT = 8;
 
       for (let i = 0; i < PING_COUNT; i++) {
         if (signal.aborted) return;
         const start = performance.now();
-        const res = await fetch(`https://speed.cloudflare.com/__down?bytes=0&r=${Math.random()}`, {
-          signal,
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `https://speed.cloudflare.com/__down?bytes=0&r=${Math.random()}`,
+          { signal, cache: "no-store" }
+        );
         await res.text();
         const duration = performance.now() - start;
         pingSamples.push(duration);
 
+        // Sort and discard highest outlier for robust latency
+        const sorted = [...pingSamples].sort((a, b) => a - b);
+        const trimmed = sorted.length > 3 ? sorted.slice(0, -1) : sorted;
         const currentPing = Math.round(
-          pingSamples.reduce((a, b) => a + b, 0) / pingSamples.length
+          trimmed.reduce((a, b) => a + b, 0) / trimmed.length
         );
+
         setState((prev) => ({
           ...prev,
           ping: currentPing,
-          progress: 5 + Math.round(((i + 1) / PING_COUNT) * 15),
+          progress: 2 + Math.round(((i + 1) / PING_COUNT) * 13), // 2% -> 15%
         }));
 
-        // Small pause between pings
         await new Promise((r) => setTimeout(r, 60));
       }
 
-      // Calculate jitter (mean difference between consecutive samples)
+      // Calculate Jitter (RFC 3550 standard mean deviation between consecutive packets)
       let jitterSum = 0;
       for (let i = 1; i < pingSamples.length; i++) {
         jitterSum += Math.abs(pingSamples[i] - pingSamples[i - 1]);
       }
       const calculatedJitter =
-        pingSamples.length > 1 ? Math.round(jitterSum / (pingSamples.length - 1)) : 0;
-      const finalPing = Math.round(
-        pingSamples.reduce((a, b) => a + b, 0) / pingSamples.length
-      );
+        pingSamples.length > 1
+          ? Math.round(jitterSum / (pingSamples.length - 1))
+          : 0;
+
+      const sortedPings = [...pingSamples].sort((a, b) => a - b);
+      const medianPing = Math.round(sortedPings[Math.floor(sortedPings.length / 2)]);
 
       setState((prev) => ({
         ...prev,
         phase: "download",
-        ping: finalPing,
+        ping: medianPing,
         jitter: calculatedJitter,
-        progress: 25,
+        progress: 15,
       }));
 
-      // ==========================================
-      // PHASE 2: DOWNLOAD SPEED TEST (Streaming)
-      // ==========================================
-      // Use 25MB test payload for accurate high-speed measurement
-      const downloadStart = performance.now();
-      const downloadRes = await fetch(
-        `https://speed.cloudflare.com/__down?bytes=25000000&r=${Math.random()}`,
-        {
-          signal,
-          cache: "no-store",
+      // ==============================================================
+      // PHASE 2: MULTI-STREAM CONCURRENT DOWNLOAD TEST (10 seconds)
+      // Saturates gigabit/high-speed connections using 5 parallel streams
+      // ==============================================================
+      const DOWNLOAD_DURATION_MS = 10000;
+      const DOWNLOAD_CONCURRENCY = 5;
+      const downloadStartTime = performance.now();
+      const downloadSamples: ByteSample[] = [];
+      const liveDownloadSpeedHistory: number[] = [];
+      let smoothedDownloadMbps = 0;
+
+      // Update ticker for download speed
+      let downloadTickerRunning = true;
+      const downloadTickerPromise = (async () => {
+        while (downloadTickerRunning && !signal.aborted) {
+          const now = performance.now();
+          const elapsed = now - downloadStartTime;
+
+          // Prune samples older than 1200ms for a smooth rolling throughput window
+          const cutoff = now - 1200;
+          while (downloadSamples.length > 0 && downloadSamples[0].timestamp < cutoff) {
+            downloadSamples.shift();
+          }
+
+          if (downloadSamples.length > 1) {
+            const windowBytes = downloadSamples.reduce((sum, s) => sum + s.bytes, 0);
+            const windowDurationSec = (now - downloadSamples[0].timestamp) / 1000;
+
+            if (windowDurationSec > 0.2) {
+              const instantMbps = (windowBytes * 8) / (windowDurationSec * 1_000_000);
+              // Exponential Moving Average filter (alpha = 0.25) to avoid abrupt jumps
+              smoothedDownloadMbps =
+                smoothedDownloadMbps === 0
+                  ? instantMbps
+                  : smoothedDownloadMbps * 0.75 + instantMbps * 0.25;
+
+              // Record samples after warm-up (first 2 seconds)
+              if (elapsed > 2000) {
+                liveDownloadSpeedHistory.push(instantMbps);
+              }
+
+              const prog = Math.min(58, 15 + (elapsed / DOWNLOAD_DURATION_MS) * 45);
+              setState((prev) => ({
+                ...prev,
+                currentDownloadSpeed: Math.round(smoothedDownloadMbps * 10) / 10,
+                progress: Math.round(prog),
+              }));
+            }
+          }
+
+          await new Promise((r) => setTimeout(r, 80));
         }
+      })();
+
+      // Worker function: streams 50MB chunks continuously until time is up
+      const runDownloadWorker = async () => {
+        while (
+          performance.now() - downloadStartTime < DOWNLOAD_DURATION_MS &&
+          !signal.aborted
+        ) {
+          try {
+            // 50MB payload per stream ensures maximum throughput pipeline
+            const res = await fetch(
+              `https://speed.cloudflare.com/__down?bytes=50000000&r=${Math.random()}`,
+              { signal, cache: "no-store" }
+            );
+
+            if (!res.body) break;
+            const reader = res.body.getReader();
+
+            while (!signal.aborted) {
+              if (performance.now() - downloadStartTime >= DOWNLOAD_DURATION_MS) {
+                reader.cancel();
+                break;
+              }
+
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              if (value && value.length > 0) {
+                downloadSamples.push({
+                  timestamp: performance.now(),
+                  bytes: value.length,
+                });
+              }
+            }
+          } catch (e: any) {
+            if (signal.aborted) break;
+            // retry worker if error occurs before timeout
+            await new Promise((r) => setTimeout(r, 100));
+          }
+        }
+      };
+
+      // Spawn concurrent workers
+      await Promise.all(
+        Array.from({ length: DOWNLOAD_CONCURRENCY }, () => runDownloadWorker())
       );
 
-      if (!downloadRes.body) {
-        throw new Error("Unable to read response stream for download test.");
+      downloadTickerRunning = false;
+      await downloadTickerPromise;
+
+      if (signal.aborted) return;
+
+      // Final download speed calculation: 85th percentile of sustained window
+      let finalDownloadMbps = smoothedDownloadMbps;
+      if (liveDownloadSpeedHistory.length > 0) {
+        liveDownloadSpeedHistory.sort((a, b) => a - b);
+        const p85Index = Math.floor(liveDownloadSpeedHistory.length * 0.85);
+        finalDownloadMbps = liveDownloadSpeedHistory[p85Index];
       }
-
-      const reader = downloadRes.body.getReader();
-      let receivedBytes = 0;
-      let lastUpdate = performance.now();
-      let windowBytes = 0;
-      let windowStart = performance.now();
-      const totalExpectedBytes = 25000000;
-
-      while (true) {
-        if (signal.aborted) return;
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const len = value ? value.length : 0;
-        receivedBytes += len;
-        windowBytes += len;
-
-        const now = performance.now();
-        // Update live speed roughly every 100ms
-        if (now - lastUpdate > 100) {
-          const windowSecs = (now - windowStart) / 1000;
-          if (windowSecs > 0) {
-            const liveMbps = (windowBytes * 8) / (windowSecs * 1000000);
-            const downloadProgress = Math.min(
-              65,
-              25 + (receivedBytes / totalExpectedBytes) * 40
-            );
-            setState((prev) => ({
-              ...prev,
-              currentDownloadSpeed: Math.round(liveMbps * 10) / 10,
-              progress: Math.round(downloadProgress),
-            }));
-          }
-          windowBytes = 0;
-          windowStart = now;
-          lastUpdate = now;
-        }
-
-        // Cap download test at max 7 seconds to keep test snappy
-        if (now - downloadStart > 7000) {
-          reader.cancel();
-          break;
-        }
-      }
-
-      const totalDownloadSecs = (performance.now() - downloadStart) / 1000;
-      const finalDownloadMbps =
-        totalDownloadSecs > 0
-          ? Math.round(((receivedBytes * 8) / (totalDownloadSecs * 1000000)) * 10) / 10
-          : 0;
+      finalDownloadMbps = Math.round(finalDownloadMbps * 10) / 10;
 
       setState((prev) => ({
         ...prev,
         phase: "upload",
         downloadSpeed: finalDownloadMbps,
         currentDownloadSpeed: finalDownloadMbps,
-        progress: 70,
+        progress: 60,
       }));
 
-      // ==========================================
-      // PHASE 3: UPLOAD SPEED TEST (Multi-chunk POST)
-      // ==========================================
-      // 3 chunks of 2MB to measure upload
-      const uploadChunkSize = 2 * 1024 * 1024; // 2 MB
-      const uploadPayload = new Uint8Array(uploadChunkSize);
-      // Fill with dummy pattern
-      for (let i = 0; i < 1024; i++) {
-        uploadPayload[i] = i % 256;
+      // Small cooldown before upload phase
+      await new Promise((r) => setTimeout(r, 400));
+
+      // ==============================================================
+      // PHASE 3: MULTI-STREAM CONCURRENT UPLOAD TEST (8 seconds)
+      // Concurrent chunk uploads to Cloudflare edge
+      // ==============================================================
+      const UPLOAD_DURATION_MS = 8000;
+      const UPLOAD_CONCURRENCY = 4;
+      const UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB chunks
+      const uploadPayload = new Uint8Array(UPLOAD_CHUNK_SIZE);
+      // Pre-fill payload
+      for (let i = 0; i < 2048; i++) {
+        uploadPayload[i] = (i * 31) % 256;
       }
 
-      let totalUploadedBytes = 0;
-      const uploadStart = performance.now();
-      const UPLOAD_CHUNKS = 4;
+      const uploadStartTime = performance.now();
+      const uploadSamples: ByteSample[] = [];
+      const liveUploadSpeedHistory: number[] = [];
+      let smoothedUploadMbps = 0;
 
-      for (let i = 0; i < UPLOAD_CHUNKS; i++) {
-        if (signal.aborted) return;
-        const chunkStart = performance.now();
+      let uploadTickerRunning = true;
+      const uploadTickerPromise = (async () => {
+        while (uploadTickerRunning && !signal.aborted) {
+          const now = performance.now();
+          const elapsed = now - uploadStartTime;
 
-        await fetch(`https://speed.cloudflare.com/__up?r=${Math.random()}`, {
-          method: "POST",
-          body: uploadPayload,
-          signal,
-          cache: "no-store",
-        });
+          // Prune samples older than 1500ms
+          const cutoff = now - 1500;
+          while (uploadSamples.length > 0 && uploadSamples[0].timestamp < cutoff) {
+            uploadSamples.shift();
+          }
 
-        const chunkDuration = (performance.now() - chunkStart) / 1000;
-        totalUploadedBytes += uploadChunkSize;
+          if (uploadSamples.length > 0) {
+            const windowBytes = uploadSamples.reduce((sum, s) => sum + s.bytes, 0);
+            const windowDurationSec = (now - uploadSamples[0].timestamp) / 1000;
 
-        const liveUploadMbps =
-          chunkDuration > 0
-            ? (uploadChunkSize * 8) / (chunkDuration * 1000000)
-            : 0;
+            if (windowDurationSec > 0.3) {
+              const instantMbps = (windowBytes * 8) / (windowDurationSec * 1_000_000);
+              smoothedUploadMbps =
+                smoothedUploadMbps === 0
+                  ? instantMbps
+                  : smoothedUploadMbps * 0.75 + instantMbps * 0.25;
 
-        const uploadProgress = 70 + Math.round(((i + 1) / UPLOAD_CHUNKS) * 30);
+              if (elapsed > 1500) {
+                liveUploadSpeedHistory.push(instantMbps);
+              }
 
-        setState((prev) => ({
-          ...prev,
-          currentUploadSpeed: Math.round(liveUploadMbps * 10) / 10,
-          progress: Math.min(100, uploadProgress),
-        }));
+              const prog = Math.min(98, 60 + (elapsed / UPLOAD_DURATION_MS) * 38);
+              setState((prev) => ({
+                ...prev,
+                currentUploadSpeed: Math.round(smoothedUploadMbps * 10) / 10,
+                progress: Math.round(prog),
+              }));
+            }
+          }
 
-        // Cap upload test at 6 seconds max
-        if (performance.now() - uploadStart > 6000) {
-          break;
+          await new Promise((r) => setTimeout(r, 80));
         }
+      })();
+
+      const runUploadWorker = async () => {
+        while (
+          performance.now() - uploadStartTime < UPLOAD_DURATION_MS &&
+          !signal.aborted
+        ) {
+          try {
+            await fetch(`https://speed.cloudflare.com/__up?r=${Math.random()}`, {
+              method: "POST",
+              body: uploadPayload,
+              signal,
+              cache: "no-store",
+            });
+
+            if (signal.aborted) break;
+            uploadSamples.push({
+              timestamp: performance.now(),
+              bytes: UPLOAD_CHUNK_SIZE,
+            });
+          } catch (e) {
+            if (signal.aborted) break;
+            await new Promise((r) => setTimeout(r, 100));
+          }
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: UPLOAD_CONCURRENCY }, () => runUploadWorker())
+      );
+
+      uploadTickerRunning = false;
+      await uploadTickerPromise;
+
+      if (signal.aborted) return;
+
+      let finalUploadMbps = smoothedUploadMbps;
+      if (liveUploadSpeedHistory.length > 0) {
+        liveUploadSpeedHistory.sort((a, b) => a - b);
+        const p85Index = Math.floor(liveUploadSpeedHistory.length * 0.85);
+        finalUploadMbps = liveUploadSpeedHistory[p85Index];
       }
+      finalUploadMbps = Math.round(finalUploadMbps * 10) / 10;
 
-      const totalUploadSecs = (performance.now() - uploadStart) / 1000;
-      const finalUploadMbps =
-        totalUploadSecs > 0
-          ? Math.round(((totalUploadedBytes * 8) / (totalUploadSecs * 1000000)) * 10) / 10
-          : 0;
-
-      // ==========================================
-      // PHASE 4: COMPLETE
-      // ==========================================
+      // ==============================================================
+      // PHASE 4: BENCHMARK COMPLETE
+      // ==============================================================
       setState((prev) => ({
         ...prev,
         phase: "complete",

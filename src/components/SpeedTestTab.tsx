@@ -9,6 +9,7 @@ import {
   Square,
   AlertCircle,
   Radio,
+  CheckCircle2,
 } from "lucide-react";
 
 export const SpeedTestTab: React.FC = () => {
@@ -28,15 +29,28 @@ export const SpeedTestTab: React.FC = () => {
   const isRunning =
     phase === "ping" || phase === "download" || phase === "upload";
 
-  // Determine which live speed to display on the main meter
-  const displaySpeed =
-    phase === "download"
-      ? currentDownloadSpeed
-      : phase === "upload"
-      ? currentUploadSpeed
-      : phase === "complete"
-      ? downloadSpeed ?? 0
-      : 0;
+  // Determine live metric to display on the central gauge
+  let displayValue = "0.0";
+  let displayUnit = "Mbps";
+  let displaySublabel = "Ready";
+
+  if (phase === "ping") {
+    displayValue = ping !== null ? `${ping}` : "—";
+    displayUnit = "ms";
+    displaySublabel = "Testing Ping";
+  } else if (phase === "download") {
+    displayValue = currentDownloadSpeed.toFixed(1);
+    displayUnit = "Mbps";
+    displaySublabel = "Download";
+  } else if (phase === "upload") {
+    displayValue = currentUploadSpeed.toFixed(1);
+    displayUnit = "Mbps";
+    displaySublabel = "Upload";
+  } else if (phase === "complete") {
+    displayValue = (downloadSpeed ?? 0).toFixed(1);
+    displayUnit = "Mbps";
+    displaySublabel = "Download";
+  }
 
   const getPhaseLabel = (p: SpeedTestPhase) => {
     switch (p) {
@@ -47,18 +61,17 @@ export const SpeedTestTab: React.FC = () => {
       case "upload":
         return "Testing Upload Speed...";
       case "complete":
-        return "Speed Test Finished";
+        return "Speed Test Completed";
       case "error":
-        return "Test Failed";
+        return "Test Interrupted / Failed";
       default:
-        return "Ready for benchmark";
+        return "Ready to Benchmark";
     }
   };
 
   // SVG Gauge calculations
   const radius = 64;
   const circumference = 2 * Math.PI * radius;
-  // Arc is 240 degrees (top open)
   const arcLength = circumference * 0.75;
   const strokeDashoffset = arcLength - (progress / 100) * arcLength;
 
@@ -70,7 +83,7 @@ export const SpeedTestTab: React.FC = () => {
           <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
             Speed Test
           </h2>
-          <p className="text-[10px] text-zinc-500">Benchmark VPN tunnel throughput</p>
+          <p className="text-[10px] text-zinc-500">Multi-stream edge benchmark</p>
         </div>
         {phase === "complete" && (
           <button
@@ -83,10 +96,10 @@ export const SpeedTestTab: React.FC = () => {
         )}
       </div>
 
-      {/* Main Meter & Gauge */}
+      {/* Main Circular Gauge & Central Readout */}
       <div className="flex flex-col items-center justify-center my-auto py-2">
         <div className="relative w-40 h-40 flex items-center justify-center">
-          {/* Circular SVG Meter */}
+          {/* Circular SVG Progress Arc */}
           <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 160 160">
             {/* Background Arc */}
             <circle
@@ -100,12 +113,12 @@ export const SpeedTestTab: React.FC = () => {
               strokeDashoffset={0}
               strokeLinecap="round"
             />
-            {/* Animated Progress Arc */}
+            {/* Active Progress Indicator */}
             <circle
               cx="80"
               cy="80"
               r={radius}
-              className="stroke-white transition-all duration-300 ease-out"
+              className="stroke-white transition-all duration-200 ease-out"
               strokeWidth="6"
               fill="transparent"
               strokeDasharray={arcLength}
@@ -114,20 +127,33 @@ export const SpeedTestTab: React.FC = () => {
             />
           </svg>
 
-          {/* Center Readout */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          {/* Central Live HUD */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none">
             {isRunning || phase === "complete" ? (
               <>
-                <span className="text-2xl font-black tracking-tight text-white font-mono">
-                  {displaySpeed.toFixed(1)}
+                {/* Direction Icon Badge */}
+                <div className="flex items-center gap-1 mb-0.5">
+                  {phase === "ping" && <Activity className="w-3.5 h-3.5 text-zinc-400 animate-pulse" />}
+                  {phase === "download" && <ArrowDown className="w-3.5 h-3.5 text-white animate-bounce" />}
+                  {phase === "upload" && <ArrowUp className="w-3.5 h-3.5 text-white animate-bounce" />}
+                  {phase === "complete" && <CheckCircle2 className="w-3.5 h-3.5 text-zinc-300" />}
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    {displaySublabel}
+                  </span>
+                </div>
+
+                {/* Live Numerical Readout */}
+                <span className="text-2xl font-black tracking-tight text-white font-mono leading-none">
+                  {displayValue}
                 </span>
-                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest -mt-0.5">
-                  Mbps
+
+                <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-widest mt-1">
+                  {displayUnit}
                 </span>
               </>
             ) : (
               <div className="flex flex-col items-center">
-                <Zap className="w-7 h-7 text-zinc-600 mb-1" />
+                <Zap className="w-8 h-8 text-zinc-600 mb-1" />
                 <span className="text-[11px] font-medium text-zinc-500">
                   Ready
                 </span>
@@ -137,7 +163,7 @@ export const SpeedTestTab: React.FC = () => {
         </div>
 
         {/* Phase Status Pill */}
-        <div className="mt-1 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800/80 text-[10px] text-zinc-300">
+        <div className="mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800/80 text-[10px] text-zinc-300 shadow-sm">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
               isRunning
@@ -149,16 +175,22 @@ export const SpeedTestTab: React.FC = () => {
                 : "bg-zinc-700"
             }`}
           />
-          <span>{getPhaseLabel(phase)}</span>
+          <span className="font-medium">{getPhaseLabel(phase)}</span>
         </div>
       </div>
 
-      {/* Metric Cards Grid (2x2) */}
+      {/* 2x2 Metric Cards Grid */}
       <div className="grid grid-cols-2 gap-2 mb-2">
         {/* Ping */}
-        <div className="bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-2.5 flex items-center justify-between">
+        <div
+          className={`border rounded-xl p-2.5 flex items-center justify-between transition-colors ${
+            phase === "ping"
+              ? "bg-zinc-800/80 border-zinc-600"
+              : "bg-zinc-900/90 border-zinc-800/90"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
+            <div className="w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
               <Activity className="w-3.5 h-3.5" />
             </div>
             <div>
@@ -171,9 +203,15 @@ export const SpeedTestTab: React.FC = () => {
         </div>
 
         {/* Jitter */}
-        <div className="bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-2.5 flex items-center justify-between">
+        <div
+          className={`border rounded-xl p-2.5 flex items-center justify-between transition-colors ${
+            phase === "ping"
+              ? "bg-zinc-800/80 border-zinc-600"
+              : "bg-zinc-900/90 border-zinc-800/90"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
+            <div className="w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
               <Radio className="w-3.5 h-3.5" />
             </div>
             <div>
@@ -186,9 +224,21 @@ export const SpeedTestTab: React.FC = () => {
         </div>
 
         {/* Download */}
-        <div className="bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-2.5 flex items-center justify-between">
+        <div
+          className={`border rounded-xl p-2.5 flex items-center justify-between transition-colors ${
+            phase === "download"
+              ? "bg-zinc-800/80 border-zinc-600"
+              : "bg-zinc-900/90 border-zinc-800/90"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
+            <div
+              className={`w-6 h-6 rounded-lg border flex items-center justify-center ${
+                phase === "download"
+                  ? "bg-white text-zinc-950 border-white"
+                  : "bg-zinc-800 border-zinc-700/60 text-zinc-400"
+              }`}
+            >
               <ArrowDown className="w-3.5 h-3.5" />
             </div>
             <div>
@@ -205,9 +255,21 @@ export const SpeedTestTab: React.FC = () => {
         </div>
 
         {/* Upload */}
-        <div className="bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-2.5 flex items-center justify-between">
+        <div
+          className={`border rounded-xl p-2.5 flex items-center justify-between transition-colors ${
+            phase === "upload"
+              ? "bg-zinc-800/80 border-zinc-600"
+              : "bg-zinc-900/90 border-zinc-800/90"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400">
+            <div
+              className={`w-6 h-6 rounded-lg border flex items-center justify-center ${
+                phase === "upload"
+                  ? "bg-white text-zinc-950 border-white"
+                  : "bg-zinc-800 border-zinc-700/60 text-zinc-400"
+              }`}
+            >
               <ArrowUp className="w-3.5 h-3.5" />
             </div>
             <div>
