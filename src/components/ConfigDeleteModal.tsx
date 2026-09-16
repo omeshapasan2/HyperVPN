@@ -22,46 +22,43 @@ export const ConfigDeleteModal: React.FC<ConfigDeleteModalProps> = ({
   if (!isOpen || !config) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-[#111827] border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/75 backdrop-blur-sm animate-fadeIn select-none">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-[320px] shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
-          <div className="flex items-center gap-2 text-rose-400">
-            <AlertTriangle className="w-5 h-5" />
-            <h2 className="text-base font-bold text-white">Delete Configuration</h2>
+        <div className="px-3.5 py-2.5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+          <div className="flex items-center gap-1.5 text-zinc-200">
+            <AlertTriangle className="w-4 h-4 text-zinc-400" />
+            <h2 className="text-xs font-bold">Delete Server</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="p-1 rounded text-zinc-400 hover:text-white transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-3">
-          <p className="text-xs text-gray-300">
-            Are you sure you want to delete the configuration{" "}
-            <span className="font-semibold text-white">"{config.remark}"</span> ({config.host}:{config.port})?
+        <div className="p-3.5 space-y-2.5">
+          <p className="text-xs text-zinc-300">
+            Delete <span className="font-bold text-white">"{config.remark}"</span> ({config.host}:{config.port})?
           </p>
 
           {isActive && isConnected && (
-            <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-200 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="p-2 bg-zinc-950 border border-zinc-700 rounded-lg text-[11px] text-zinc-300 flex items-start gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
               <span>
-                This server is currently connected. Deleting it will immediately terminate the VPN connection.
+                This server is connected. Deleting will immediately disconnect the VPN.
               </span>
             </div>
           )}
-
-          <p className="text-[11px] text-gray-500">This action cannot be undone.</p>
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 border-t border-gray-800 bg-gray-900/50 flex items-center justify-end gap-3">
+        <div className="px-3.5 py-2.5 border-t border-zinc-800 bg-zinc-950/60 flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+            className="px-3 py-1 rounded-lg text-xs font-medium text-zinc-400 hover:text-white transition-colors"
           >
             Cancel
           </button>
@@ -70,10 +67,10 @@ export const ConfigDeleteModal: React.FC<ConfigDeleteModalProps> = ({
               onConfirm();
               onClose();
             }}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950 transition-all flex items-center gap-1.5"
+            className="px-3 py-1 rounded-lg text-xs font-bold bg-white hover:bg-zinc-200 text-black transition-colors flex items-center gap-1 shadow-sm"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete Server
+            <Trash2 className="w-3 h-3" />
+            Delete
           </button>
         </div>
       </div>

@@ -52,66 +52,69 @@ export function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0f1d] text-gray-100 select-none">
-      {/* Top Header with live status, speeds, and connect button */}
-      <Header
-        status={status}
-        activeConfig={activeConfig}
-        onToggleConnect={handleToggle}
-        onClearError={clearError}
-      />
-
-      {/* Main Tab Navigation */}
+    <div className="flex flex-row h-screen w-screen overflow-hidden text-zinc-100 select-none">
+      {/* Left-side Vertical Rail Navigation */}
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Tab Contents */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {activeTab === "configs" && (
-          <ConfigsTab
-            configs={configs}
-            activeConfigId={activeConfigId}
-            isConnected={status.connected}
-            pingingIds={pingingIds}
-            onSelectConfig={selectActiveConfig}
-            onSaveConfig={saveConfig}
-            onDeleteConfig={deleteConfig}
-            onCopyUri={copyConfigUri}
-            onPingConfig={pingSingleConfig}
-            onPingAll={pingAll}
-            onAddFromUri={addFromUri}
-          />
-        )}
+      {/* Main Right Content Area */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        {/* Top Header with live status, speeds, and connect button */}
+        <Header
+          status={status}
+          activeConfig={activeConfig}
+          onToggleConnect={handleToggle}
+          onClearError={clearError}
+        />
 
-        {activeTab === "usage" && (
-          <UsageTab
-            history={history}
-            status={status}
-            onResetHistory={resetHistory}
-            onRefreshHistory={refreshHistory}
-          />
-        )}
+        {/* Active Tab View */}
+        <main className="flex-1 flex flex-col overflow-hidden relative">
+          {activeTab === "configs" && (
+            <ConfigsTab
+              configs={configs}
+              activeConfigId={activeConfigId}
+              isConnected={status.connected}
+              pingingIds={pingingIds}
+              onSelectConfig={selectActiveConfig}
+              onSaveConfig={saveConfig}
+              onDeleteConfig={deleteConfig}
+              onCopyUri={copyConfigUri}
+              onPingConfig={pingSingleConfig}
+              onPingAll={pingAll}
+              onAddFromUri={addFromUri}
+            />
+          )}
 
-        {activeTab === "verify" && (
-          <VerifyTab settings={settings} onSaveSettings={saveSettings} />
-        )}
+          {activeTab === "usage" && (
+            <UsageTab
+              history={history}
+              status={status}
+              onResetHistory={resetHistory}
+              onRefreshHistory={refreshHistory}
+            />
+          )}
 
-        {activeTab === "settings" && (
-          <SettingsTab
-            settings={settings}
-            binaries={binaries}
-            onSaveSettings={saveSettings}
-            onCheckBinaries={checkBinaries}
-          />
-        )}
+          {activeTab === "verify" && (
+            <VerifyTab settings={settings} onSaveSettings={saveSettings} />
+          )}
 
-        {activeTab === "logs" && (
-          <LogsViewer
-            logs={logs}
-            onClearLogs={clearLogs}
-            onRefreshLogs={refreshLogs}
-          />
-        )}
-      </main>
+          {activeTab === "settings" && (
+            <SettingsTab
+              settings={settings}
+              binaries={binaries}
+              onSaveSettings={saveSettings}
+              onCheckBinaries={checkBinaries}
+            />
+          )}
+
+          {activeTab === "logs" && (
+            <LogsViewer
+              logs={logs}
+              onClearLogs={clearLogs}
+              onRefreshLogs={refreshLogs}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 }

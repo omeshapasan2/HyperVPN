@@ -57,20 +57,20 @@ export function formatTime(timestamp: number | string): string {
 }
 
 /**
- * Formats ping latency
+ * Formats ping latency (monochrome)
  */
 export function formatLatency(ms?: number | null): { text: string; color: string } {
   if (ms === undefined || ms === null) {
-    return { text: "--", color: "text-gray-400" };
+    return { text: "--", color: "text-zinc-500" };
   }
   if (ms < 0) {
-    return { text: "Timeout", color: "text-red-400" };
+    return { text: "Timeout", color: "text-zinc-500 line-through" };
   }
   if (ms < 100) {
-    return { text: `${ms} ms`, color: "text-emerald-400" };
+    return { text: `${ms} ms`, color: "text-zinc-100 font-bold" };
   }
   if (ms < 250) {
-    return { text: `${ms} ms`, color: "text-amber-400" };
+    return { text: `${ms} ms`, color: "text-zinc-300" };
   }
-  return { text: `${ms} ms`, color: "text-rose-400" };
+  return { text: `${ms} ms`, color: "text-zinc-400" };
 }

@@ -9,7 +9,6 @@ import {
   Zap,
   Server,
   ClipboardPaste,
-  Sparkles,
   AlertCircle,
 } from "lucide-react";
 
@@ -90,107 +89,85 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col p-6 overflow-y-auto space-y-5">
-      {/* Top action bar: Quick Paste + Add Button + Ping All */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        {/* Quick Paste Form */}
-        <form onSubmit={handleQuickPaste} className="flex-1 flex items-center gap-2">
-          <div className="relative flex-1">
-            <ClipboardPaste className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={quickPasteUri}
-              onChange={(e) => {
-                setQuickPasteUri(e.target.value);
-                if (quickPasteError) setQuickPasteError(null);
-              }}
-              placeholder="Quick Paste vless:// URI to import instantly..."
-              className="w-full pl-9 pr-4 py-2 bg-gray-900/90 border border-gray-800 rounded-xl text-xs text-gray-200 font-mono placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!quickPasteUri.trim()}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:hover:bg-gray-800 text-white font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-sm shrink-0"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Import
-          </button>
+    <div className="flex-1 flex flex-col p-3.5 overflow-y-auto space-y-3">
+      {/* Top Action Bar */}
+      <div className="flex items-center gap-2">
+        <form onSubmit={handleQuickPaste} className="flex-1 relative min-w-0">
+          <ClipboardPaste className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={quickPasteUri}
+            onChange={(e) => {
+              setQuickPasteUri(e.target.value);
+              if (quickPasteError) setQuickPasteError(null);
+            }}
+            placeholder="Paste vless:// URI..."
+            className="w-full pl-8 pr-2.5 py-1.5 bg-zinc-900/90 border border-zinc-800 rounded-lg text-xs text-zinc-200 font-mono placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+          />
         </form>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onPingAll}
-            disabled={configs.length === 0}
-            className="px-3.5 py-2 bg-gray-900/80 hover:bg-gray-800 text-gray-300 hover:text-white border border-gray-800 hover:border-gray-700 font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 disabled:opacity-50"
-            title="Ping all configurations in parallel"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            Ping All
-          </button>
-          <button
-            onClick={handleOpenAdd}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-lg shadow-indigo-950"
-          >
-            <Plus className="w-4 h-4" />
-            Add Server
-          </button>
-        </div>
+        <button
+          onClick={onPingAll}
+          disabled={configs.length === 0}
+          className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 rounded-lg text-xs transition-colors shrink-0 disabled:opacity-40"
+          title="Ping all servers"
+        >
+          <Zap className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={handleOpenAdd}
+          className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 font-medium text-xs rounded-lg transition-colors flex items-center gap-1 shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add</span>
+        </button>
       </div>
 
       {/* Quick Paste Error Message */}
       {quickPasteError && (
-        <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-          <span>{quickPasteError}</span>
+        <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <span className="truncate">{quickPasteError}</span>
         </div>
       )}
 
-      {/* Search and Server Count Bar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative w-full max-w-xs">
-          <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+      {/* Search Bar */}
+      {configs.length > 0 && (
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search servers by name, host, SNI..."
-            className="w-full pl-8 pr-3 py-1.5 bg-gray-900/60 border border-gray-800/80 rounded-xl text-xs text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder={`Search ${configs.length} servers...`}
+            className="w-full pl-8 pr-2.5 py-1.5 bg-zinc-900/50 border border-zinc-800/80 rounded-lg text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
           />
         </div>
+      )}
 
-        <span className="text-xs text-gray-400">
-          Showing <span className="font-semibold text-white">{filteredConfigs.length}</span> of{" "}
-          <span className="font-semibold text-white">{configs.length}</span> servers
-        </span>
-      </div>
-
-      {/* Server List Grid */}
+      {/* Server List */}
       {configs.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-12 px-4 text-center border-2 border-dashed border-gray-800 rounded-2xl bg-gray-900/20">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
-            <Server className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold text-white mb-1">No VLESS Servers Added Yet</h3>
-          <p className="text-xs text-gray-400 max-w-sm mb-4">
-            Paste a <code className="text-indigo-300">vless://</code> URI above or click "Add Server" to
-            configure your first XTLS Reality or TLS outbound tunnel.
+        <div className="flex-1 flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20">
+          <Server className="w-8 h-8 text-zinc-600 mb-2" />
+          <h3 className="text-xs font-bold text-zinc-300 mb-1">No Servers Added</h3>
+          <p className="text-[11px] text-zinc-500 max-w-xs mb-3">
+            Paste a vless:// URI above or click "Add" to configure your server.
           </p>
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-950 transition-all flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-xs rounded-lg border border-zinc-700 transition-colors flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" />
-            Add First Server
+            <Plus className="w-3.5 h-3.5" />
+            Add Server
           </button>
         </div>
       ) : filteredConfigs.length === 0 ? (
-        <div className="py-8 text-center text-xs text-gray-500">
+        <div className="py-8 text-center text-xs text-zinc-500">
           No servers matching "{searchQuery}"
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div className="flex flex-col gap-2">
           {filteredConfigs.map((cfg) => (
             <ConfigCard
               key={cfg.id}

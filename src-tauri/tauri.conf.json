@@ -13,11 +13,13 @@
     "windows": [
       {
         "title": "HyperVPN",
-        "width": 960,
-        "height": 700,
-        "minWidth": 860,
-        "minHeight": 620,
-        "resizable": true,
+        "width": 390,
+        "height": 660,
+        "minWidth": 380,
+        "minHeight": 640,
+        "maxWidth": 430,
+        "maxHeight": 720,
+        "resizable": false,
         "fullscreen": false,
         "center": true
       }
