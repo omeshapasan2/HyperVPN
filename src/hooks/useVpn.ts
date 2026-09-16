@@ -74,7 +74,17 @@ export function useVpn(configs: VlessConfig[] = [], activeConfigId: string | nul
     if (status.connected) {
       await disconnect();
     } else {
-      const activeCfg = configs.find((c) => c.id === activeConfigId) || configs[0];
+      let activeCfg = configs.find((c) => c.id === activeConfigId) || configs[0];
+      if (!activeCfg) {
+        try {
+          const saved = await invoke<VlessConfig[]>("get_saved_configs");
+          const storedActiveId = localStorage.getItem("hypervpn_active_config_id");
+          activeCfg = saved.find((c) => c.id === storedActiveId) || saved[0];
+        } catch (err) {
+          console.error("Failed to load configs on tray toggle:", err);
+        }
+      }
+
       if (activeCfg) {
         await connect(activeCfg);
       } else {

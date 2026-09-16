@@ -97,6 +97,25 @@ impl ProcessManager {
         self.logs.lock().unwrap().iter().cloned().collect()
     }
 
+    /// Checks if a running connection was unexpectedly dropped, and resets state and tray if so.
+    pub fn check_connection_health(&self) {
+        let was_connected = self.connected_at.lock().unwrap().is_some();
+        if was_connected && !self.is_connected() {
+            self.add_log("system", "warn", "Unexpected VPN connection drop detected. Cleaning up routes and resetting status...");
+            *self.connected_at.lock().unwrap() = None;
+            let active_cfg = self.active_config.lock().unwrap().take();
+            let host = active_cfg.as_ref().map(|c| c.host.as_str()).unwrap_or("");
+            let _ = crate::routing::cleanup_tun_routes(host, &[]);
+
+            if let Ok(guard) = self.app_handle.lock() {
+                if let Some(ref handle) = *guard {
+                    let _ = handle.emit("vpn-status-changed", false);
+                    crate::tray::update_tray_status(handle, false, None);
+                }
+            }
+        }
+    }
+
     /// Finds the path to a sidecar binary (e.g. "xray.exe", "tun2socks.exe", "wintun.dll", "WebView2Loader.dll")
     pub fn find_binary_path(&self, binary_name: &str) -> Option<PathBuf> {
         // Check alongside current executable
@@ -343,6 +362,7 @@ impl ProcessManager {
         if let Ok(guard) = self.app_handle.lock() {
             if let Some(ref handle) = *guard {
                 let _ = handle.emit("vpn-status-changed", true);
+                crate::tray::update_tray_status(handle, true, Some(&config.remark));
             }
         }
 
@@ -378,6 +398,7 @@ impl ProcessManager {
         if let Ok(guard) = self.app_handle.lock() {
             if let Some(ref handle) = *guard {
                 let _ = handle.emit("vpn-status-changed", false);
+                crate::tray::update_tray_status(handle, false, None);
             }
         }
 

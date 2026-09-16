@@ -18,11 +18,11 @@ import { ShieldAlert } from "lucide-react";
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>("configs");
 
-  const { status, clearError, connect, disconnect } = useVpn();
+  const [vpnConnected, setVpnConnected] = useState(false);
 
   // Active config switch handler: if currently connected, reconnect to the new config
   const handleActiveConfigSwitched = async (newConfig: VlessConfig) => {
-    if (status.connected) {
+    if (vpnConnected) {
       await connect(newConfig);
     }
   };
@@ -40,6 +40,13 @@ export function App() {
     pingSingleConfig,
     pingAll,
   } = useConfigs(handleActiveConfigSwitched);
+
+  const { status, clearError, connect, disconnect } = useVpn(configs, activeConfigId);
+
+  // Keep local vpnConnected updated for config switch handler
+  if (status.connected !== vpnConnected) {
+    setVpnConnected(status.connected);
+  }
 
   const { history, resetHistory, refreshHistory } = useUsage();
   const {

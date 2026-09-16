@@ -89,6 +89,8 @@ impl StatsTracker {
 
     /// Polls Xray Stats API via `xray.exe api statsquery --server=127.0.0.1:<stats_port>`
     pub fn poll_xray_stats(&self, process_manager: &ProcessManager, stats_port: u16) {
+        process_manager.check_connection_health();
+
         if !process_manager.is_connected() {
             // If disconnected, set current speeds to 0
             let mut live = self.live.lock().unwrap();
