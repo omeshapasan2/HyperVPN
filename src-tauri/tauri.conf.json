@@ -42,9 +42,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "binaries/*"
-    ]
+    "resources": {
+      "binaries/WebView2Loader.dll": "WebView2Loader.dll",
+      "binaries/wintun.dll": "wintun.dll",
+      "binaries/*": "binaries/"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer-hooks.nsi"
+      }
+    }
   },
   "plugins": {}
 }
