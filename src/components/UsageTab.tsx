@@ -150,19 +150,23 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           <span className="text-[11px] font-bold text-zinc-300">
             30-Day Activity
           </span>
-          {hoveredDay ? (
-            <span className="text-[10px] font-mono text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
-              {hoveredDay.date.slice(5)}: {formatBytes(hoveredDay.total)}
+          <div className="bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 min-w-[110px] h-5 overflow-hidden flex items-center justify-center">
+            <span
+              key={hoveredDay ? hoveredDay.date : "peak"}
+              className="text-[10px] font-mono text-zinc-300 inline-block animate-odometerUp whitespace-nowrap"
+            >
+              {hoveredDay
+                ? `${hoveredDay.date.slice(5)}: ${formatBytes(hoveredDay.total)}`
+                : `Peak: ${formatBytes(maxTotalBytes)}`}
             </span>
-          ) : (
-            <span className="text-[10px] font-mono text-zinc-500">
-              Peak: {formatBytes(maxTotalBytes)}
-            </span>
-          )}
+          </div>
         </div>
 
         {/* SVG/CSS Bar Chart */}
-        <div className="h-28 w-full flex items-end gap-1 pt-2 pb-1 relative">
+        <div
+          className="h-28 w-full flex items-end gap-1 pt-2 pb-1 relative"
+          onMouseLeave={() => setHoveredDay(null)}
+        >
           {chartData.map((d) => {
             const heightPct = Math.max((d.total / maxTotalBytes) * 100, 4);
             const isToday = d.date === todayKey;
@@ -172,7 +176,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
               <div
                 key={d.date}
                 onMouseEnter={() => setHoveredDay(d)}
-                onMouseLeave={() => setHoveredDay(null)}
                 className="flex-1 h-full flex flex-col justify-end items-center group relative cursor-pointer"
               >
                 <div
