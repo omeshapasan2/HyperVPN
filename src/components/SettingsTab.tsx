@@ -118,7 +118,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     appUpdateInfo?.version || updateInfo?.latestVersion || "";
 
   const currentAppVersion =
-    appUpdateInfo?.currentVersion || updateInfo?.currentVersion || "2.0.5";
+    appUpdateInfo?.currentVersion || updateInfo?.currentVersion || "2.0.6";
 
   const appReleaseNotes =
     appUpdateInfo?.body || updateInfo?.releaseNotes || "";
