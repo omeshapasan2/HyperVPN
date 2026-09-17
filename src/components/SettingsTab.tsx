@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import {
   AppSettings,
   UpdateCheckResult,
+  AppUpdateInfo,
+  AppUpdateProgress,
   BinariesUpdateCheckResult,
   BinaryUpdateProgress,
 } from "../types/config";
@@ -31,6 +33,9 @@ interface SettingsTabProps {
   updateInfo: UpdateCheckResult | null;
   checkingUpdate: boolean;
   updateError: string | null;
+  appUpdateInfo?: AppUpdateInfo | null;
+  appUpdateProgress?: AppUpdateProgress | null;
+  installingAppUpdate?: boolean;
   binariesUpdateInfo?: BinariesUpdateCheckResult | null;
   checkingBinariesUpdate?: boolean;
   binariesUpdateProgress?: BinaryUpdateProgress | null;
@@ -40,6 +45,7 @@ interface SettingsTabProps {
   onCheckBinaries: () => Promise<void>;
   onRelaunchAsAdmin: () => Promise<void>;
   onCheckForUpdates: () => Promise<void>;
+  onInstallAppUpdate?: () => Promise<void>;
   onCheckCoreBinariesUpdates?: () => Promise<BinariesUpdateCheckResult | null>;
   onUpdateCoreBinaries?: (binariesToUpdate?: string[]) => Promise<void>;
 }
@@ -51,6 +57,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   updateInfo,
   checkingUpdate,
   updateError,
+  appUpdateInfo,
+  appUpdateProgress,
+  installingAppUpdate = false,
   binariesUpdateInfo,
   checkingBinariesUpdate = false,
   binariesUpdateProgress,
@@ -60,6 +69,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onCheckBinaries,
   onRelaunchAsAdmin,
   onCheckForUpdates,
+  onInstallAppUpdate,
   onCheckCoreBinariesUpdates,
   onUpdateCoreBinaries,
 }) => {
@@ -98,6 +108,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       window.open(url, "_blank");
     }
   };
+
+  const hasAppUpdate =
+    appUpdateInfo?.available ||
+    (updateInfo?.hasUpdate ?? false) ||
+    appUpdateProgress?.status === "available";
+
+  const latestAppVersion =
+    appUpdateInfo?.version || updateInfo?.latestVersion || "";
+
+  const currentAppVersion =
+    appUpdateInfo?.currentVersion || updateInfo?.currentVersion || "2.0.5";
+
+  const appReleaseNotes =
+    appUpdateInfo?.body || updateInfo?.releaseNotes || "";
 
   return (
     <div className="flex-1 flex flex-col p-3.5 overflow-y-auto space-y-3 select-none">
@@ -152,19 +176,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
       </div>
 
-      {/* In-App GitHub Releases Updater Card */}
+      {/* Native In-App Software Updates Card */}
       <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 space-y-2.5">
         <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
           <div className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
             <span className="text-[11px] font-bold text-zinc-300">
-              Software Updates
+              Application Updates
             </span>
           </div>
           <button
             type="button"
             onClick={() => onCheckForUpdates()}
-            disabled={checkingUpdate}
+            disabled={checkingUpdate || installingAppUpdate}
             className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 hover:text-white text-[10px] font-medium rounded-md transition-colors flex items-center gap-1 border border-zinc-700"
           >
             <RotateCw className={`w-2.5 h-2.5 ${checkingUpdate ? "animate-spin" : ""}`} />
@@ -172,42 +196,91 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </button>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div className="space-y-2 text-xs">
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-zinc-400">Current Installed Version</span>
             <span className="font-mono font-bold text-zinc-200">
-              v{updateInfo?.currentVersion || "1.0.0"}
+              v{currentAppVersion}
             </span>
           </div>
 
+          {/* Error Banner */}
           {updateError && (
-            <div className="p-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-400">
-              {updateError}
+            <div className="p-2 bg-red-950/40 border border-red-900/60 rounded-lg text-[10px] text-red-300 flex items-start gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+              <span className="break-all">{updateError}</span>
             </div>
           )}
 
-          {updateInfo && !checkingUpdate && (
-            <div className="mt-2 pt-2 border-t border-zinc-800/60 space-y-2">
-              {updateInfo.hasUpdate ? (
+          {/* Download & Install Live Progress Bar */}
+          {installingAppUpdate && appUpdateProgress && (
+            <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="font-medium text-zinc-300 flex items-center gap-1.5">
+                  <RotateCw className="w-3 h-3 animate-spin text-white" />
+                  {appUpdateProgress.message || "Downloading and installing update..."}
+                </span>
+                {appUpdateProgress.percent !== undefined && (
+                  <span className="font-mono font-bold text-white">
+                    {appUpdateProgress.percent}%
+                  </span>
+                )}
+              </div>
+              <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-white h-1.5 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.max(5, Math.min(100, appUpdateProgress.percent || 0))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Available Update / Up to Date Details */}
+          {!checkingUpdate && !installingAppUpdate && (
+            <div className="pt-1 border-t border-zinc-800/60 space-y-2">
+              {hasAppUpdate ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-white flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-white" />
-                      New Version Available: v{updateInfo.latestVersion}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDownload(updateInfo.downloadUrl)}
-                      className="px-2.5 py-1 bg-white hover:bg-zinc-200 text-black text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm"
-                    >
-                      <Download className="w-3 h-3" />
-                      Get Update
-                    </button>
+                    <div>
+                      <span className="text-[11px] font-bold text-white flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-white" />
+                        New Version: v{latestAppVersion}
+                      </span>
+                      <p className="text-[10px] text-zinc-400">
+                        Includes latest performance improvements & security patches.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {onInstallAppUpdate ? (
+                        <button
+                          type="button"
+                          onClick={() => onInstallAppUpdate()}
+                          className="px-2.5 py-1 bg-white hover:bg-zinc-200 text-black text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
+                        >
+                          <ArrowDownToLine className="w-3 h-3" />
+                          Update & Restart
+                        </button>
+                      ) : (
+                        updateInfo?.downloadUrl && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDownload(updateInfo.downloadUrl)}
+                            className="px-2.5 py-1 bg-white hover:bg-zinc-200 text-black text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                          >
+                            <Download className="w-3 h-3" />
+                            Get Update
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
 
-                  {updateInfo.releaseNotes && (
+                  {appReleaseNotes && (
                     <div className="p-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-400 max-h-24 overflow-y-auto font-mono whitespace-pre-wrap">
-                      {updateInfo.releaseNotes}
+                      {appReleaseNotes}
                     </div>
                   )}
                 </div>
@@ -217,13 +290,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <CheckCircle2 className="w-3 h-3 text-white" />
                     You are running the latest version.
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenDownload(updateInfo.downloadUrl)}
-                    className="text-zinc-500 hover:text-zinc-300 flex items-center gap-0.5"
-                  >
-                    Releases <ExternalLink className="w-2.5 h-2.5" />
-                  </button>
+                  {updateInfo?.downloadUrl && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDownload(updateInfo.downloadUrl)}
+                      className="text-zinc-500 hover:text-zinc-300 flex items-center gap-0.5"
+                    >
+                      Releases <ExternalLink className="w-2.5 h-2.5" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>

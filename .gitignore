@@ -17,5 +17,12 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
+# Keys & Signing
+*.key
+*.key.pub
+.tauri/
+src-tauri/*.key
+src-tauri/*.key.pub
+
 # Temporary
 dlls/

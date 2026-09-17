@@ -70,6 +70,9 @@ export function App() {
     updateInfo,
     checkingUpdate,
     updateError,
+    appUpdateInfo,
+    appUpdateProgress,
+    installingAppUpdate,
     binariesUpdateInfo,
     checkingBinariesUpdate,
     binariesUpdateProgress,
@@ -79,6 +82,7 @@ export function App() {
     checkBinaries,
     relaunchAsAdmin,
     checkForUpdates,
+    installAppUpdate,
     checkCoreBinariesUpdates,
     updateCoreBinaries,
   } = useSettings();
@@ -164,6 +168,9 @@ export function App() {
               updateInfo={updateInfo}
               checkingUpdate={checkingUpdate}
               updateError={updateError}
+              appUpdateInfo={appUpdateInfo}
+              appUpdateProgress={appUpdateProgress}
+              installingAppUpdate={installingAppUpdate}
               binariesUpdateInfo={binariesUpdateInfo}
               checkingBinariesUpdate={checkingBinariesUpdate}
               binariesUpdateProgress={binariesUpdateProgress}
@@ -173,6 +180,7 @@ export function App() {
               onCheckBinaries={checkBinaries}
               onRelaunchAsAdmin={relaunchAsAdmin}
               onCheckForUpdates={checkForUpdates}
+              onInstallAppUpdate={installAppUpdate}
               onCheckCoreBinariesUpdates={checkCoreBinariesUpdates}
               onUpdateCoreBinaries={updateCoreBinaries}
             />

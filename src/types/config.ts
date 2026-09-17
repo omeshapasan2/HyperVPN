@@ -132,6 +132,23 @@ export interface UpdateCheckResult {
   publishedAt: string;
 }
 
+export interface AppUpdateInfo {
+  version: string;
+  currentVersion: string;
+  date?: string;
+  body?: string;
+  available: boolean;
+}
+
+export interface AppUpdateProgress {
+  status: "idle" | "checking" | "available" | "up-to-date" | "downloading" | "installing" | "restarting" | "error";
+  totalBytes?: number;
+  downloadedBytes?: number;
+  percent?: number;
+  message?: string;
+  error?: string | null;
+}
+
 export interface BinaryItemStatus {
   name: string;
   description: string;

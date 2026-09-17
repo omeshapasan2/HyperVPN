@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useSpeedTest, SpeedTestPhase } from "../hooks/useSpeedTest";
+import { useIpLocation } from "../hooks/useIpLocation";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   Zap,
   ArrowDown,
@@ -10,10 +12,29 @@ import {
   AlertCircle,
   Radio,
   CheckCircle2,
+  Globe,
+  MapPin,
+  Copy,
+  Check,
+  RefreshCw,
+  Server,
 } from "lucide-react";
 
 export const SpeedTestTab: React.FC = () => {
   const { state, startTest, stopTest, resetTest } = useSpeedTest();
+  const {
+    ip,
+    city,
+    region,
+    country,
+    countryCode,
+    isp,
+    loading: ipLoading,
+    refresh: refreshIp,
+  } = useIpLocation();
+
+  const [copied, setCopied] = useState(false);
+
   const {
     phase,
     ping,
@@ -28,6 +49,24 @@ export const SpeedTestTab: React.FC = () => {
 
   const isRunning =
     phase === "ping" || phase === "download" || phase === "upload";
+
+  const handleCopyIp = async () => {
+    if (!ip) return;
+    try {
+      if (typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__) {
+        await writeText(ip);
+      } else {
+        await navigator.clipboard.writeText(ip);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Fallback
+      navigator.clipboard?.writeText(ip);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
 
   // Determine live metric to display on the central gauge
   let displayValue = "0.0";
@@ -75,10 +114,15 @@ export const SpeedTestTab: React.FC = () => {
   const arcLength = circumference * 0.75;
   const strokeDashoffset = arcLength - (progress / 100) * arcLength;
 
+  // Format location string
+  const locationString = [city, region, country || countryCode]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <div className="flex-1 flex flex-col p-3.5 overflow-hidden justify-between">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-1.5">
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
             Speed Test
@@ -96,9 +140,87 @@ export const SpeedTestTab: React.FC = () => {
         )}
       </div>
 
+      {/* IP & Location Display Card */}
+      <div className="relative bg-zinc-900/80 border border-zinc-800/80 rounded-xl p-2.5 backdrop-blur-md transition-all shadow-sm">
+        <div className="grid grid-cols-2 gap-2">
+          {/* IP Address Section */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center text-zinc-400 shrink-0">
+              <Globe className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] text-zinc-500 uppercase font-semibold tracking-wider flex items-center gap-1">
+                Your IP
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-xs font-bold text-zinc-100 font-mono truncate">
+                  {ipLoading && !ip ? (
+                    <span className="text-zinc-600 animate-pulse">Detecting...</span>
+                  ) : (
+                    ip || "Unavailable"
+                  )}
+                </span>
+                {ip && (
+                  <button
+                    onClick={handleCopyIp}
+                    className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0"
+                    title={copied ? "Copied!" : "Copy IP"}
+                  >
+                    {copied ? (
+                      <Check className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Location & ISP Section */}
+          <div className="flex items-center justify-between gap-1.5 min-w-0 pl-2 border-l border-zinc-800/80">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="w-7 h-7 rounded-lg bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center text-zinc-400 shrink-0">
+                <MapPin className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] text-zinc-500 uppercase font-semibold tracking-wider flex items-center gap-1">
+                  Location
+                </div>
+                <div className="text-xs font-bold text-zinc-200 truncate mt-0.5" title={locationString}>
+                  {ipLoading && !locationString ? (
+                    <span className="text-zinc-600 animate-pulse">Locating...</span>
+                  ) : (
+                    locationString || "Unknown"
+                  )}
+                </div>
+                {isp && (
+                  <div className="text-[9px] text-zinc-500 truncate flex items-center gap-1">
+                    <Server className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                    <span className="truncate">{isp}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Refresh Button */}
+            <button
+              onClick={refreshIp}
+              disabled={ipLoading}
+              className={`p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors shrink-0 ${
+                ipLoading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              title="Refresh IP & Location"
+            >
+              <RefreshCw className={`w-3 h-3 ${ipLoading ? "animate-spin text-zinc-400" : ""}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Main Circular Gauge & Central Readout */}
-      <div className="flex flex-col items-center justify-center my-auto py-2">
-        <div className="relative w-40 h-40 flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center my-auto py-1">
+        <div className="relative w-36 h-36 flex items-center justify-center">
           {/* Circular SVG Progress Arc */}
           <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 160 160">
             {/* Background Arc */}
@@ -153,7 +275,7 @@ export const SpeedTestTab: React.FC = () => {
               </>
             ) : (
               <div className="flex flex-col items-center">
-                <Zap className="w-8 h-8 text-zinc-600 mb-1" />
+                <Zap className="w-7 h-7 text-zinc-600 mb-1" />
                 <span className="text-[11px] font-medium text-zinc-500">
                   Ready
                 </span>
@@ -163,7 +285,7 @@ export const SpeedTestTab: React.FC = () => {
         </div>
 
         {/* Phase Status Pill */}
-        <div className="mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800/80 text-[10px] text-zinc-300 shadow-sm">
+        <div className="mt-1 flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-zinc-900 border border-zinc-800/80 text-[10px] text-zinc-300 shadow-sm">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
               isRunning
@@ -299,7 +421,7 @@ export const SpeedTestTab: React.FC = () => {
         {isRunning ? (
           <button
             onClick={stopTest}
-            className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
+            className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.99]"
           >
             <Square className="w-3.5 h-3.5 fill-current" />
             Stop Speed Test
