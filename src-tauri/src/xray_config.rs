@@ -294,7 +294,7 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
                 },
                 "sniffing": {
                     "enabled": true,
-                    "destOverride": ["http", "tls"],
+                    "destOverride": ["http", "tls", "quic"],
                     "routeOnly": true
                 }
             },

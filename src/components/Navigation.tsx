@@ -19,26 +19,66 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
     { id: "logs" as TabType, label: "Logs", icon: Terminal },
   ];
 
-  // Track tab index to determine vertical wave propagation direction (down vs up)
+  const navRef = useRef<HTMLElement>(null);
+  const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Track tab index & position to anchor vertical meniscus shimmer to active tab
   const prevTabRef = useRef<TabType>(activeTab);
   const [waveState, setWaveState] = useState<{
     active: boolean;
+    startY: number;
+    endY: number;
+    height: number;
     direction: "down" | "up";
     id: number;
   }>({
     active: false,
+    startY: 0,
+    endY: 0,
+    height: 40,
     direction: "down",
     id: 0,
   });
 
   useEffect(() => {
     if (prevTabRef.current !== activeTab) {
-      const prevIdx = tabs.findIndex((t) => t.id === prevTabRef.current);
-      const currIdx = tabs.findIndex((t) => t.id === activeTab);
+      const prevTab = prevTabRef.current;
+      const currTab = activeTab;
+
+      const prevIdx = tabs.findIndex((t) => t.id === prevTab);
+      const currIdx = tabs.findIndex((t) => t.id === currTab);
       const direction = currIdx >= prevIdx ? "down" : "up";
+
+      // Calculate pixel positions from DOM elements
+      const prevEl = tabButtonRefs.current[prevTab];
+      const currEl = tabButtonRefs.current[currTab];
+      const navEl = navRef.current;
+
+      let startY = 0;
+      let endY = 0;
+      let beamHeight = 40;
+
+      if (prevEl && currEl && navEl) {
+        const navRect = navEl.getBoundingClientRect();
+        const prevRect = prevEl.getBoundingClientRect();
+        const currRect = currEl.getBoundingClientRect();
+
+        startY = prevRect.top - navRect.top;
+        endY = currRect.top - navRect.top;
+        beamHeight = currRect.height || 40;
+      } else {
+        // Fallback offset approximation
+        const baseOffset = 56;
+        const itemHeight = 46;
+        startY = baseOffset + prevIdx * itemHeight;
+        endY = baseOffset + currIdx * itemHeight;
+      }
 
       setWaveState({
         active: true,
+        startY,
+        endY,
+        height: beamHeight,
         direction,
         id: Date.now(),
       });
@@ -47,11 +87,11 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
 
       const timer = setTimeout(() => {
         setWaveState((prev) => ({ ...prev, active: false }));
-      }, 1100);
+      }, 850);
 
       return () => clearTimeout(timer);
     }
-  }, [activeTab]);
+  }, [activeTab, tabs]);
 
   // Handle wheel scrolling over the sidebar to switch tabs
   const lastWheelTimeRef = useRef<number>(0);
@@ -86,6 +126,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
 
   return (
     <motion.nav
+      ref={navRef}
       onWheel={handleWheel}
       className="relative w-14 bg-zinc-950/80 backdrop-blur-2xl border-r border-white/[0.08] flex flex-col items-center py-3 gap-2 shrink-0 select-none z-20 overflow-hidden cursor-default"
       style={{
@@ -101,8 +142,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
       }}
     >
       {/* ──────────────────────────────────────────────────────────────────
-          VERTICAL LIQUID GLASS WAVE PROPAGATION
-          Specular caustic light travelling vertically along the navigation rail
+          VERTICAL LIQUID GLASS MENISCUS SHIMMER
+          Right-edge light refraction streak starting from the active tab position
           ────────────────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {waveState.active && (
@@ -112,53 +153,30 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.15 }}
           >
-            {/* 1. Specular Liquid Caustic Wave Front (Gliding vertically) */}
+            {/* Right Edge Liquid Meniscus Shimmer Streak */}
             <motion.div
-              className="absolute left-0 right-0 h-28 -skew-y-12"
-              initial={{
-                y: waveState.direction === "down" ? "-30%" : "120%",
-                opacity: 0,
-              }}
-              animate={{
-                y: waveState.direction === "down" ? "120%" : "-30%",
-                opacity: [0, 0.85, 1, 0.7, 0],
-              }}
-              transition={{
-                duration: 0.95,
-                ease: [0.16, 1, 0.3, 1],
-              }}
+              className="absolute right-0 w-[1px] pointer-events-none"
               style={{
                 background:
-                  waveState.direction === "down"
-                    ? "linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.01) 15%, rgba(255,255,255,0.08) 35%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.05) 68%, transparent 100%)"
-                    : "linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.02) 20%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.02) 75%, transparent 100%)",
+                  "linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.2) 80%, transparent 100%)",
+                boxShadow: "0 0 2px rgba(255,255,255,0.5)",
+                height: waveState.height + 8,
               }}
-            />
-
-            {/* 2. Right Edge Liquid Meniscus Shimmer */}
-            <motion.div
-              className="absolute top-0 bottom-0 right-0 w-[1.5px]"
               initial={{
-                backgroundPosition:
-                  waveState.direction === "down" ? "0% 0%" : "0% 100%",
+                top: waveState.startY - 4,
                 opacity: 0,
+                scaleY: 0.7,
               }}
               animate={{
-                backgroundPosition:
-                  waveState.direction === "down" ? "0% 100%" : "0% 0%",
-                opacity: [0, 0.9, 1, 0],
+                top: waveState.endY - 4,
+                opacity: [0, 0.9, 1, 0.6, 0],
+                scaleY: [0.7, 1.25, 1],
               }}
               transition={{
-                duration: 1.0,
+                duration: 0.55,
                 ease: [0.22, 1, 0.36, 1],
-              }}
-              style={{
-                background:
-                  "linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)",
-                backgroundSize: "100% 35%",
-                backgroundRepeat: "no-repeat",
               }}
             />
           </motion.div>
@@ -189,6 +207,9 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
           return (
             <motion.button
               key={tab.id}
+              ref={(el) => {
+                tabButtonRefs.current[tab.id] = el;
+              }}
               onClick={() => onTabChange(tab.id)}
               title={tab.label}
               whileHover={{ scale: 1.04 }}

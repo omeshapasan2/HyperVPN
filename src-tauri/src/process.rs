@@ -276,6 +276,9 @@ impl ProcessManager {
             &format!("socks5://127.0.0.1:{}", socks_port),
             "--loglevel",
             "warning",
+            "--mtu",
+            "1420",
+            "--tcp-auto-tuning",
             "--udp-timeout",
             "1m",
         ]);
