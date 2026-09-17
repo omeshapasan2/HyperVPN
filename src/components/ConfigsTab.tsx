@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { VlessConfig } from "../types/config";
 import { ConfigCard } from "./ConfigCard";
 import { ConfigEditModal } from "./ConfigEditModal";
@@ -39,19 +39,67 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
   onPingAll,
   onAddFromUri,
 }) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [quickPasteUri, setQuickPasteUri] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return localStorage.getItem("hypervpn_draft_search_query") || "";
+  });
+  const [quickPasteUri, setQuickPasteUri] = useState(() => {
+    return localStorage.getItem("hypervpn_draft_quick_paste") || "";
+  });
   const [quickPasteError, setQuickPasteError] = useState<string | null>(null);
 
-  // Modals state
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingConfig, setEditingConfig] = useState<VlessConfig | null>(null);
+  // Modals state with draft persistence across webview destruction
+  const [isEditModalOpen, setIsEditModalOpen] = useState(() => {
+    return localStorage.getItem("hypervpn_draft_modal_open") === "true";
+  });
+  const [editingConfig, setEditingConfig] = useState<VlessConfig | null>(() => {
+    const saved = localStorage.getItem("hypervpn_draft_editing_config");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingConfig, setDeletingConfig] = useState<VlessConfig | null>(null);
 
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [qrConfig, setQrConfig] = useState<VlessConfig | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hypervpn_draft_search_query", searchQuery);
+    } catch {}
+  }, [searchQuery]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hypervpn_draft_quick_paste", quickPasteUri);
+    } catch {}
+  }, [quickPasteUri]);
+
+  // Flush drafts on teardown (minimize-to-tray webview destroy)
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      try {
+        localStorage.setItem("hypervpn_draft_search_query", searchQuery);
+        localStorage.setItem("hypervpn_draft_quick_paste", quickPasteUri);
+
+        if (isEditModalOpen && editingConfig) {
+          localStorage.setItem("hypervpn_draft_modal_open", "true");
+          localStorage.setItem("hypervpn_draft_editing_config", JSON.stringify(editingConfig));
+        }
+      } catch {}
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [searchQuery, quickPasteUri, isEditModalOpen, editingConfig]);
+
+
 
   // Filtered configs
   const filteredConfigs = configs.filter((cfg) => {
@@ -71,6 +119,9 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
     const res = await onAddFromUri(quickPasteUri.trim());
     if (res.success) {
       setQuickPasteUri("");
+      try {
+        localStorage.removeItem("hypervpn_draft_quick_paste");
+      } catch {}
     } else {
       setQuickPasteError(res.error || "Failed to parse VLESS URI");
     }
@@ -79,11 +130,33 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
   const handleOpenAdd = () => {
     setEditingConfig(null);
     setIsEditModalOpen(true);
+    try {
+      localStorage.setItem("hypervpn_draft_modal_open", "true");
+      localStorage.removeItem("hypervpn_draft_editing_config");
+    } catch {}
   };
 
   const handleOpenEdit = (cfg: VlessConfig) => {
     setEditingConfig(cfg);
     setIsEditModalOpen(true);
+    try {
+      localStorage.setItem("hypervpn_draft_modal_open", "true");
+      localStorage.setItem("hypervpn_draft_editing_config", JSON.stringify(cfg));
+    } catch {}
+  };
+
+  const handleCloseEdit = () => {
+    setIsEditModalOpen(false);
+    setEditingConfig(null);
+    try {
+      localStorage.removeItem("hypervpn_draft_modal_open");
+      localStorage.removeItem("hypervpn_draft_editing_config");
+    } catch {}
+  };
+
+  const handleSaveConfig = (cfg: VlessConfig) => {
+    onSaveConfig(cfg);
+    handleCloseEdit();
   };
 
   const handleOpenDelete = (cfg: VlessConfig) => {
@@ -197,8 +270,8 @@ export const ConfigsTab: React.FC<ConfigsTabProps> = ({
       <ConfigEditModal
         isOpen={isEditModalOpen}
         initialConfig={editingConfig}
-        onClose={() => setIsEditModalOpen(false)}
-        onSave={onSaveConfig}
+        onClose={handleCloseEdit}
+        onSave={handleSaveConfig}
       />
 
       <ConfigDeleteModal

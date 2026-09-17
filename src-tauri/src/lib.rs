@@ -432,11 +432,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            let _ = app.get_webview_window("main").map(|w| {
-                let _ = w.show();
-                let _ = w.unminimize();
-                let _ = w.set_focus();
-            });
+            let _ = tray::show_or_create_main_window(app);
         }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::default(),
@@ -460,6 +456,14 @@ pub fn run() {
 
             // Provide app handle to ProcessManager for event emission
             pm_clone.set_app_handle(app.handle().clone());
+
+            // Handle --autostart flag: destroy window on launch to start headless in tray
+            let is_autostart = std::env::args().any(|a| a == "--autostart");
+            if is_autostart {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.destroy();
+                }
+            }
 
             // Spawn background timer to poll Xray Stats API every 1 second
             let pm_bg = Arc::clone(&pm_clone);
@@ -502,16 +506,23 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                // Intercept close button and minimize to tray
-                let app = window.app_handle();
-                if let Some(state) = app.try_state::<AppState>() {
-                    let settings = state.storage_manager.get_settings();
-                    if settings.minimize_to_tray_on_close {
-                        api.prevent_close();
-                        let _ = window.hide();
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let app = window.app_handle();
+                    if let Some(state) = app.try_state::<AppState>() {
+                        let settings = state.storage_manager.get_settings();
+                        if settings.minimize_to_tray_on_close {
+                            api.prevent_close();
+                            let _ = window.destroy();
+                            tray::update_tray_menu(app);
+                        }
                     }
                 }
+                WindowEvent::Destroyed => {
+                    let app = window.app_handle();
+                    tray::update_tray_menu(app);
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -537,6 +548,12 @@ pub fn run() {
             get_windows_autostart,
             check_for_updates,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running HyperVPN");
+        .build(tauri::generate_context!())
+        .expect("error while building HyperVPN")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                // Prevent app from exiting when all windows are closed/destroyed
+                api.prevent_exit();
+            }
+        });
 }

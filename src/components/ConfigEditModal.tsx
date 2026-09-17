@@ -47,35 +47,93 @@ export const ConfigEditModal: React.FC<ConfigEditModalProps> = ({
   const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
-    if (initialConfig) {
-      setFormData(initialConfig);
-      setActiveMode("form");
+    if (!isOpen) return;
+
+    // Check if an existing draft exists in localStorage
+    const savedDraftJson = localStorage.getItem("hypervpn_draft_modal_form");
+    const savedMode = localStorage.getItem("hypervpn_draft_modal_mode") as "form" | "paste" | null;
+    const savedPasteUri = localStorage.getItem("hypervpn_draft_modal_paste_uri");
+
+    let loadedFromDraft = false;
+
+    if (savedDraftJson) {
+      try {
+        const draft = JSON.parse(savedDraftJson) as VlessConfig;
+        if (initialConfig && draft.id === initialConfig.id) {
+          setFormData(draft);
+          loadedFromDraft = true;
+        } else if (!initialConfig && (!draft.rawOriginal || draft.id)) {
+          setFormData(draft);
+          loadedFromDraft = true;
+        }
+      } catch {}
+    }
+
+    if (savedPasteUri) {
+      setPasteUri(savedPasteUri);
     } else {
-      setFormData({
-        id: generateConfigId(),
-        remark: "My VLESS Server",
-        host: "",
-        port: 443,
-        uuid: "",
-        encryption: "none",
-        flow: "xtls-rprx-vision",
-        network: "tcp",
-        headerType: "none",
-        security: "reality",
-        fp: "chrome",
-        sni: "",
-        pbk: "",
-        sid: "",
-        allowInsecure: false,
-        rawOriginal: "",
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
       setPasteUri("");
-      setActiveMode("paste");
+    }
+
+    if (savedMode) {
+      setActiveMode(savedMode);
+    } else {
+      setActiveMode(initialConfig ? "form" : "paste");
+    }
+
+    if (!loadedFromDraft) {
+      if (initialConfig) {
+        setFormData(initialConfig);
+        setActiveMode("form");
+      } else {
+        setFormData({
+          id: generateConfigId(),
+          remark: "My VLESS Server",
+          host: "",
+          port: 443,
+          uuid: "",
+          encryption: "none",
+          flow: "xtls-rprx-vision",
+          network: "tcp",
+          headerType: "none",
+          security: "reality",
+          fp: "chrome",
+          sni: "",
+          pbk: "",
+          sid: "",
+          allowInsecure: false,
+          rawOriginal: "",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
     }
     setErrors([]);
   }, [initialConfig, isOpen]);
+
+  // Persist in-progress drafts while modal is open
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        localStorage.setItem("hypervpn_draft_modal_form", JSON.stringify(formData));
+        localStorage.setItem("hypervpn_draft_modal_mode", activeMode);
+        localStorage.setItem("hypervpn_draft_modal_paste_uri", pasteUri);
+      } catch {}
+    }
+  }, [isOpen, formData, activeMode, pasteUri]);
+
+  const clearModalDrafts = () => {
+    try {
+      localStorage.removeItem("hypervpn_draft_modal_form");
+      localStorage.removeItem("hypervpn_draft_modal_mode");
+      localStorage.removeItem("hypervpn_draft_modal_paste_uri");
+    } catch {}
+  };
+
+  const handleClose = () => {
+    clearModalDrafts();
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -102,6 +160,7 @@ export const ConfigEditModal: React.FC<ConfigEditModalProps> = ({
       return;
     }
 
+    clearModalDrafts();
     onSave({
       ...formData,
       port: Number(formData.port),
@@ -119,7 +178,7 @@ export const ConfigEditModal: React.FC<ConfigEditModalProps> = ({
             {isEditing ? "Edit Server" : "Add Server"}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 rounded text-zinc-400 hover:text-white transition-colors"
           >
             <X className="w-3.5 h-3.5" />
@@ -400,7 +459,7 @@ export const ConfigEditModal: React.FC<ConfigEditModalProps> = ({
         <div className="px-3.5 py-2.5 border-t border-zinc-800 bg-zinc-950/60 flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="px-3 py-1 rounded-lg text-xs font-medium text-zinc-400 hover:text-white transition-colors"
           >
             Cancel

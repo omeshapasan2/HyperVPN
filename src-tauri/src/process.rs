@@ -60,6 +60,10 @@ impl ProcessManager {
         self.active_config.lock().unwrap().as_ref().map(|c| c.id.clone())
     }
 
+    pub fn get_active_config_remark(&self) -> Option<String> {
+        self.active_config.lock().unwrap().as_ref().map(|c| c.remark.clone())
+    }
+
     pub fn get_uptime_seconds(&self) -> u64 {
         if let Some(start) = *self.connected_at.lock().unwrap() {
             start.elapsed().as_secs()
@@ -110,7 +114,7 @@ impl ProcessManager {
             if let Ok(guard) = self.app_handle.lock() {
                 if let Some(ref handle) = *guard {
                     let _ = handle.emit("vpn-status-changed", false);
-                    crate::tray::update_tray_status(handle, false, None);
+                    crate::tray::update_tray_menu(handle);
                 }
             }
         }
@@ -362,7 +366,7 @@ impl ProcessManager {
         if let Ok(guard) = self.app_handle.lock() {
             if let Some(ref handle) = *guard {
                 let _ = handle.emit("vpn-status-changed", true);
-                crate::tray::update_tray_status(handle, true, Some(&config.remark));
+                crate::tray::update_tray_menu(handle);
             }
         }
 
@@ -398,7 +402,7 @@ impl ProcessManager {
         if let Ok(guard) = self.app_handle.lock() {
             if let Some(ref handle) = *guard {
                 let _ = handle.emit("vpn-status-changed", false);
-                crate::tray::update_tray_status(handle, false, None);
+                crate::tray::update_tray_menu(handle);
             }
         }
 

@@ -21,10 +21,32 @@ interface VerifyTabProps {
 }
 
 export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }) => {
-  const [selectedIsp, setSelectedIsp] = useState<"slt" | "dialog">(settings.defaultIsp || "slt");
+  const [selectedIsp, setSelectedIsp] = useState<"slt" | "dialog">(() => {
+    const saved = localStorage.getItem("hypervpn_draft_selected_isp");
+    if (saved === "slt" || saved === "dialog") return saved;
+    return settings.defaultIsp || "slt";
+  });
 
-  const [sltCredentials, setSltCredentials] = useState(settings.slt);
-  const [dialogCredentials, setDialogCredentials] = useState(settings.dialog);
+  const [sltCredentials, setSltCredentials] = useState(() => {
+    const draft = localStorage.getItem("hypervpn_draft_slt");
+    if (draft) {
+      try {
+        return JSON.parse(draft);
+      } catch {}
+    }
+    return settings.slt;
+  });
+
+  const [dialogCredentials, setDialogCredentials] = useState(() => {
+    const draft = localStorage.getItem("hypervpn_draft_dialog");
+    if (draft) {
+      try {
+        return JSON.parse(draft);
+      } catch {}
+    }
+    return settings.dialog;
+  });
+
   const [isSaved, setIsSaved] = useState(false);
 
   // Verification Step state
@@ -42,9 +64,46 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
   const [usageError, setUsageError] = useState<string | null>(null);
 
   useEffect(() => {
-    setSltCredentials(settings.slt);
-    setDialogCredentials(settings.dialog);
+    try {
+      localStorage.setItem("hypervpn_draft_selected_isp", selectedIsp);
+    } catch {}
+  }, [selectedIsp]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hypervpn_draft_slt", JSON.stringify(sltCredentials));
+    } catch {}
+  }, [sltCredentials]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hypervpn_draft_dialog", JSON.stringify(dialogCredentials));
+    } catch {}
+  }, [dialogCredentials]);
+
+  useEffect(() => {
+    // Only overwrite if no local draft exists
+    if (!localStorage.getItem("hypervpn_draft_slt")) {
+      setSltCredentials(settings.slt);
+    }
+    if (!localStorage.getItem("hypervpn_draft_dialog")) {
+      setDialogCredentials(settings.dialog);
+    }
   }, [settings]);
+
+  // Flush drafts on teardown
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      try {
+        localStorage.setItem("hypervpn_draft_selected_isp", selectedIsp);
+        localStorage.setItem("hypervpn_draft_slt", JSON.stringify(sltCredentials));
+        localStorage.setItem("hypervpn_draft_dialog", JSON.stringify(dialogCredentials));
+      } catch {}
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [selectedIsp, sltCredentials, dialogCredentials]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -66,7 +125,16 @@ export const VerifyTab: React.FC<VerifyTabProps> = ({ settings, onSaveSettings }
       slt: sltCredentials,
       dialog: dialogCredentials,
     };
+
     await onSaveSettings(updated);
+
+    // Clear persisted drafts after successfully saving
+    try {
+      localStorage.removeItem("hypervpn_draft_selected_isp");
+      localStorage.removeItem("hypervpn_draft_slt");
+      localStorage.removeItem("hypervpn_draft_dialog");
+    } catch {}
+
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };

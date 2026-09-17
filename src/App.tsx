@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { Navigation, TabType } from "./components/Navigation";
 import { ConfigsTab } from "./components/ConfigsTab";
@@ -16,7 +16,21 @@ import { VlessConfig } from "./types/config";
 import { ShieldAlert } from "lucide-react";
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<TabType>("configs");
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const savedTab = localStorage.getItem("hypervpn_active_tab");
+    if (savedTab && ["configs", "usage", "speed", "verify", "settings", "logs"].includes(savedTab)) {
+      return savedTab as TabType;
+    }
+    return "configs";
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("hypervpn_active_tab", activeTab);
+    } catch (e) {
+      console.warn("Failed to persist activeTab:", e);
+    }
+  }, [activeTab]);
 
   const [vpnConnected, setVpnConnected] = useState(false);
 
