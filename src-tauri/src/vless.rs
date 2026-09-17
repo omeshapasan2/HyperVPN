@@ -51,6 +51,8 @@ pub struct VlessConfig {
     pub sni: String,
     pub pbk: Option<String>,
     pub sid: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
     /// allowInsecure: Required for plain-TLS configs where the SNI is a decoy domain (e.g. netflix.com)
     /// rather than a domain the server holds a CA certificate for.
     #[serde(default)]

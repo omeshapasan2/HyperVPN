@@ -76,6 +76,7 @@ export function parseVlessUri(rawUri: string, existingId?: string): VlessConfig 
 
   const fp = params.get("fp") || "chrome";
   const sni = params.get("sni") || host;
+  const path = params.get("path") || undefined;
 
   if (!remark) {
     remark = `${host}:${port}`;
@@ -98,6 +99,7 @@ export function parseVlessUri(rawUri: string, existingId?: string): VlessConfig 
     sni,
     pbk,
     sid,
+    path,
     allowInsecure: false, // Default to false, can be toggled by user
     rawOriginal: trimmed,
     createdAt: now,
@@ -122,6 +124,7 @@ export function serializeVlessUri(config: VlessConfig): string {
     sni,
     pbk,
     sid,
+    path,
     remark,
   } = config;
 
@@ -137,6 +140,9 @@ export function serializeVlessUri(config: VlessConfig): string {
   searchParams.set("fp", fp || "chrome");
   if (sni) {
     searchParams.set("sni", sni);
+  }
+  if (path) {
+    searchParams.set("path", path);
   }
   if (security === "reality") {
     if (pbk) searchParams.set("pbk", pbk);

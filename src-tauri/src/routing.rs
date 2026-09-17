@@ -180,8 +180,8 @@ pub fn configure_wintun_adapter(adapter_name: &str, wintun_ip: &str) -> Result<(
     let addr_res = run_cmd("cmd", &["/c", &addr_cmd])?;
     println!("[Routing] netsh address config result: {}", addr_res.trim());
 
-    // 2. Set MTU to 1500 to prevent packet fragmentation issues
-    let mtu_cmd = format!("netsh interface ipv4 set subinterface \"{}\" mtu=1500 store=active", adapter_name);
+    // 2. Set MTU to 1420 to prevent packet fragmentation over outer TLS/TCP tunnels
+    let mtu_cmd = format!("netsh interface ipv4 set subinterface \"{}\" mtu=1420 store=active", adapter_name);
     let _ = run_cmd("cmd", &["/c", &mtu_cmd]);
 
     // 3. Set primary DNS to 1.1.1.1 (Cloudflare secure DNS)

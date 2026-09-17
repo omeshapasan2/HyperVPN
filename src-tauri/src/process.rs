@@ -277,7 +277,7 @@ impl ProcessManager {
             "--loglevel",
             "warning",
             "--udp-timeout",
-            "5m",
+            "1m",
             "--tcp-auto-tuning",
             "--tcp-sndbuf",
             "2m",

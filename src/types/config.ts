@@ -16,6 +16,7 @@ export interface VlessConfig {
   sni: string;
   pbk?: string;
   sid?: string;
+  path?: string;
   allowInsecure: boolean;
   rawOriginal: string;
   latency?: number | null;

@@ -144,6 +144,9 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
         NetworkType::Http => "http",
     };
 
+    let ws_path = config.path.as_deref().unwrap_or("/").trim();
+    let ws_path_str = if ws_path.is_empty() { "/" } else { ws_path };
+
     // 1. Build streamSettings based on security type (TLS vs Reality)
     let stream_settings = match config.security {
         SecurityType::Tls => {
@@ -171,7 +174,7 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
             // WebSocket transport settings
             if config.network == NetworkType::Ws {
                 settings["wsSettings"] = json!({
-                    "path": "/",
+                    "path": ws_path_str,
                     "headers": {
                         "Host": if config.sni.is_empty() { &config.host } else { &config.sni }
                     }
@@ -196,7 +199,7 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
 
             if config.network == NetworkType::Ws {
                 settings["wsSettings"] = json!({
-                    "path": "/",
+                    "path": ws_path_str,
                     "headers": {
                         "Host": if config.sni.is_empty() { &config.host } else { &config.sni }
                     }
@@ -213,7 +216,7 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
 
             if config.network == NetworkType::Ws {
                 settings["wsSettings"] = json!({
-                    "path": "/",
+                    "path": ws_path_str,
                     "headers": {
                         "Host": if config.sni.is_empty() { &config.host } else { &config.sni }
                     }
@@ -254,9 +257,10 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
         },
         "dns": {
             "servers": [
+                "https://1.1.1.1/dns-query",
+                "https://8.8.8.8/dns-query",
                 "1.1.1.1",
-                "8.8.8.8",
-                "https://1.1.1.1/dns-query"
+                "8.8.8.8"
             ],
             "queryStrategy": "UseIPv4"
         },
@@ -292,7 +296,8 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
                 },
                 "sniffing": {
                     "enabled": true,
-                    "destOverride": ["http", "tls", "quic"]
+                    "destOverride": ["http", "tls"],
+                    "routeOnly": true
                 }
             },
             {
@@ -322,6 +327,10 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
                 "streamSettings": stream_settings
             },
             {
+                "tag": "dns-out",
+                "protocol": "dns"
+            },
+            {
                 "tag": "direct",
                 "protocol": "freedom"
             },
@@ -342,7 +351,14 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
                     "type": "field",
                     "port": "53",
                     "network": "udp,tcp",
-                    "outboundTag": "proxy"
+                    "outboundTag": "dns-out"
+                },
+                {
+                    "type": "field",
+                    "ip": [
+                        "geoip:private"
+                    ],
+                    "outboundTag": "direct"
                 }
             ]
         }
