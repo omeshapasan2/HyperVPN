@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { UsageHistory, VpnStatus } from "../types/config";
 import { formatBytes } from "../utils/formatters";
 import {
@@ -150,16 +151,33 @@ export const UsageTab: React.FC<UsageTabProps> = ({
           <span className="text-[11px] font-bold text-zinc-300">
             30-Day Activity
           </span>
-          <div className="bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 min-w-[110px] h-5 overflow-hidden flex items-center justify-center">
-            <span
-              key={hoveredDay ? hoveredDay.date : "peak"}
-              className="text-[10px] font-mono text-zinc-300 inline-block animate-odometerUp whitespace-nowrap"
-            >
-              {hoveredDay
-                ? `${hoveredDay.date.slice(5)}: ${formatBytes(hoveredDay.total)}`
-                : `Peak: ${formatBytes(maxTotalBytes)}`}
-            </span>
-          </div>
+          <motion.div
+            layout
+            transition={{
+              type: "spring",
+              stiffness: 450,
+              damping: 28,
+            }}
+            className="text-[10px] font-mono text-zinc-300 bg-zinc-800/90 backdrop-blur px-2 py-0.5 rounded border border-zinc-700 shadow-sm flex items-center justify-center overflow-hidden"
+          >
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={hoveredDay ? hoveredDay.date : "peak"}
+                initial={{ opacity: 0, y: 5, filter: "blur(3px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -5, filter: "blur(3px)" }}
+                transition={{
+                  duration: 0.14,
+                  ease: "easeOut",
+                }}
+                className="whitespace-nowrap inline-block"
+              >
+                {hoveredDay
+                  ? `${hoveredDay.date.slice(5)}: ${formatBytes(hoveredDay.total)}`
+                  : `Peak: ${formatBytes(maxTotalBytes)}`}
+              </motion.span>
+            </AnimatePresence>
+          </motion.div>
         </div>
 
         {/* SVG/CSS Bar Chart */}
