@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { AppSettings, UpdateCheckResult } from "../types/config";
+import {
+  AppSettings,
+  UpdateCheckResult,
+  BinariesUpdateCheckResult,
+  BinaryUpdateProgress,
+} from "../types/config";
 
 export interface BinariesStatus {
   xrayFound: boolean;
@@ -46,6 +52,14 @@ export function useSettings() {
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+
+  // Core Binaries In-App Updater states
+  const [binariesUpdateInfo, setBinariesUpdateInfo] = useState<BinariesUpdateCheckResult | null>(null);
+  const [checkingBinariesUpdate, setCheckingBinariesUpdate] = useState<boolean>(false);
+  const [binariesUpdateProgress, setBinariesUpdateProgress] = useState<BinaryUpdateProgress | null>(null);
+  const [updatingBinaries, setUpdatingBinaries] = useState<boolean>(false);
+  const [binariesUpdateError, setBinariesUpdateError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
@@ -112,6 +126,39 @@ export function useSettings() {
     }
   }, []);
 
+  const checkCoreBinariesUpdates = useCallback(async () => {
+    setCheckingBinariesUpdate(true);
+    setBinariesUpdateError(null);
+    try {
+      const result = await invoke<BinariesUpdateCheckResult>("check_core_binaries_updates");
+      setBinariesUpdateInfo(result);
+      return result;
+    } catch (err) {
+      const msg = typeof err === "string" ? err : (err as Error).message || "Failed to check core binaries updates";
+      setBinariesUpdateError(msg);
+      return null;
+    } finally {
+      setCheckingBinariesUpdate(false);
+    }
+  }, []);
+
+  const updateCoreBinaries = useCallback(async (binariesToUpdate?: string[]) => {
+    setUpdatingBinaries(true);
+    setBinariesUpdateError(null);
+    try {
+      const result = await invoke<BinariesUpdateCheckResult>("update_core_binaries", {
+        binariesToUpdate: binariesToUpdate || null,
+      });
+      setBinariesUpdateInfo(result);
+      await checkBinaries();
+    } catch (err) {
+      const msg = typeof err === "string" ? err : (err as Error).message || "Failed to update core binaries";
+      setBinariesUpdateError(msg);
+    } finally {
+      setUpdatingBinaries(false);
+    }
+  }, [checkBinaries]);
+
   const saveSettings = useCallback(async (newSettings: AppSettings) => {
     setSettings(newSettings);
     try {
@@ -137,6 +184,19 @@ export function useSettings() {
     fetchSettings();
     checkBinaries();
     checkElevation();
+
+    let unlisten: (() => void) | undefined;
+    const setupListener = async () => {
+      unlisten = await listen<BinaryUpdateProgress>("binaries-update-progress", (event) => {
+        setBinariesUpdateProgress(event.payload);
+      });
+    };
+
+    setupListener();
+
+    return () => {
+      if (unlisten) unlisten();
+    };
   }, [fetchSettings, checkBinaries, checkElevation]);
 
   return {
@@ -146,12 +206,19 @@ export function useSettings() {
     updateInfo,
     checkingUpdate,
     updateError,
+    binariesUpdateInfo,
+    checkingBinariesUpdate,
+    binariesUpdateProgress,
+    updatingBinaries,
+    binariesUpdateError,
     loading,
     saveSettings,
     checkBinaries,
     checkElevation,
     relaunchAsAdmin,
     checkForUpdates,
+    checkCoreBinariesUpdates,
+    updateCoreBinaries,
     refreshSettings: fetchSettings,
   };
 }

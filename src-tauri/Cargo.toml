@@ -31,6 +31,7 @@ uuid = { version = "1.8", features = ["v4", "serde"] }
 dirs-next = "2.0"
 sha2 = "0.10"
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 # Windows-specific system crates if needed

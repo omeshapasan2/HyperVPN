@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { AppSettings, UpdateCheckResult } from "../types/config";
+import {
+  AppSettings,
+  UpdateCheckResult,
+  BinariesUpdateCheckResult,
+  BinaryUpdateProgress,
+} from "../types/config";
 import { BinariesStatus } from "../hooks/useSettings";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -14,6 +19,9 @@ import {
   Download,
   ExternalLink,
   Sparkles,
+  Cpu,
+  ArrowDownToLine,
+  AlertCircle,
 } from "lucide-react";
 
 interface SettingsTabProps {
@@ -23,10 +31,17 @@ interface SettingsTabProps {
   updateInfo: UpdateCheckResult | null;
   checkingUpdate: boolean;
   updateError: string | null;
+  binariesUpdateInfo?: BinariesUpdateCheckResult | null;
+  checkingBinariesUpdate?: boolean;
+  binariesUpdateProgress?: BinaryUpdateProgress | null;
+  updatingBinaries?: boolean;
+  binariesUpdateError?: string | null;
   onSaveSettings: (settings: AppSettings) => Promise<void>;
   onCheckBinaries: () => Promise<void>;
   onRelaunchAsAdmin: () => Promise<void>;
   onCheckForUpdates: () => Promise<void>;
+  onCheckCoreBinariesUpdates?: () => Promise<BinariesUpdateCheckResult | null>;
+  onUpdateCoreBinaries?: (binariesToUpdate?: string[]) => Promise<void>;
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -36,10 +51,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   updateInfo,
   checkingUpdate,
   updateError,
+  binariesUpdateInfo,
+  checkingBinariesUpdate = false,
+  binariesUpdateProgress,
+  updatingBinaries = false,
+  binariesUpdateError,
   onSaveSettings,
   onCheckBinaries,
   onRelaunchAsAdmin,
   onCheckForUpdates,
+  onCheckCoreBinariesUpdates,
+  onUpdateCoreBinaries,
 }) => {
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [newExclusion, setNewExclusion] = useState("");
@@ -210,64 +232,191 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </div>
 
       <form id="settings-form" onSubmit={handleSave} className="space-y-3">
-        {/* Core Sidecar Binaries Status */}
+        {/* Core Sidecar Binaries In-App Updater */}
         <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 space-y-2.5">
           <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
-            <span className="text-[11px] font-bold text-zinc-300">
-              Core Binaries
-            </span>
-            <button
-              type="button"
-              onClick={() => onCheckBinaries()}
-              className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[10px] font-medium rounded-md transition-colors flex items-center gap-1 border border-zinc-700"
-            >
-              <RotateCw className="w-2.5 h-2.5" />
-              Check
-            </button>
+            <div className="flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-zinc-300" />
+              <span className="text-[11px] font-bold text-zinc-300">
+                Core Engine Binaries (In-App Updater)
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (onCheckCoreBinariesUpdates) {
+                    await onCheckCoreBinariesUpdates();
+                  }
+                  await onCheckBinaries();
+                }}
+                disabled={checkingBinariesUpdate || updatingBinaries}
+                className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-400 hover:text-white text-[10px] font-medium rounded-md transition-colors flex items-center gap-1 border border-zinc-700"
+              >
+                <RotateCw className={`w-2.5 h-2.5 ${checkingBinariesUpdate ? "animate-spin" : ""}`} />
+                {checkingBinariesUpdate ? "Checking..." : "Check Engine"}
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5">
-            {/* xray.exe */}
-            <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-800/80 flex flex-col justify-between gap-1">
-              <span className="text-[10px] font-mono font-bold text-zinc-300">xray.exe</span>
-              {binaries.xrayFound ? (
-                <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-300">
-                  <CheckCircle2 className="w-2.5 h-2.5 text-white" /> Ready
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-500">
-                  <XCircle className="w-2.5 h-2.5 text-zinc-500" /> Missing
-                </span>
-              )}
-            </div>
+          {/* Quick status summary / Binary cards */}
+          <div className="space-y-1.5">
+            {binariesUpdateInfo?.binaries ? (
+              <div className="space-y-1.5">
+                {binariesUpdateInfo.binaries.map((b) => (
+                  <div
+                    key={b.name}
+                    className="p-2 bg-zinc-950/80 rounded-lg border border-zinc-800/80 flex items-center justify-between text-xs"
+                  >
+                    <div className="space-y-0.5 min-w-0 pr-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-zinc-200 text-[11px]">
+                          {b.name}
+                        </span>
+                        {b.hasUpdate ? (
+                          <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] rounded font-medium">
+                            Update Available
+                          </span>
+                        ) : b.exists ? (
+                          <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] rounded font-medium">
+                            Up to date
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 bg-red-500/20 text-red-300 border border-red-500/30 text-[9px] rounded font-medium">
+                            Missing
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-400 truncate">
+                        {b.description}
+                      </p>
+                    </div>
 
-            {/* tun2socks.exe */}
-            <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-800/80 flex flex-col justify-between gap-1">
-              <span className="text-[10px] font-mono font-bold text-zinc-300">tun2socks</span>
-              {binaries.tun2socksFound ? (
-                <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-300">
-                  <CheckCircle2 className="w-2.5 h-2.5 text-white" /> Ready
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-500">
-                  <XCircle className="w-2.5 h-2.5 text-zinc-500" /> Missing
-                </span>
-              )}
-            </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-[10px] font-mono text-zinc-300">
+                        {b.currentVersion ? `v${b.currentVersion}` : b.exists ? "Installed" : "None"}
+                      </div>
+                      {b.latestVersion && b.latestVersion !== "latest" && (
+                        <div className="text-[9px] font-mono text-zinc-500">
+                          latest: v{b.latestVersion}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-1.5">
+                {/* xray.exe */}
+                <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-800/80 flex flex-col justify-between gap-1">
+                  <span className="text-[10px] font-mono font-bold text-zinc-300">xray.exe</span>
+                  {binaries.xrayFound ? (
+                    <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-300">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-white" /> Ready
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-500">
+                      <XCircle className="w-2.5 h-2.5 text-zinc-500" /> Missing
+                    </span>
+                  )}
+                </div>
 
-            {/* wintun.dll */}
-            <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-800/80 flex flex-col justify-between gap-1">
-              <span className="text-[10px] font-mono font-bold text-zinc-300">wintun.dll</span>
-              {binaries.wintunFound ? (
-                <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-300">
-                  <CheckCircle2 className="w-2.5 h-2.5 text-white" /> Ready
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-500">
-                  <XCircle className="w-2.5 h-2.5 text-zinc-500" /> Missing
-                </span>
-              )}
-            </div>
+                {/* tun2socks.exe */}
+                <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-800/80 flex flex-col justify-between gap-1">
+                  <span className="text-[10px] font-mono font-bold text-zinc-300">tun2socks</span>
+                  {binaries.tun2socksFound ? (
+                    <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-300">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-white" /> Ready
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-500">
+                      <XCircle className="w-2.5 h-2.5 text-zinc-500" /> Missing
+                    </span>
+                  )}
+                </div>
+
+                {/* wintun.dll */}
+                <div className="bg-zinc-950 p-2 rounded-lg border border-zinc-800/80 flex flex-col justify-between gap-1">
+                  <span className="text-[10px] font-mono font-bold text-zinc-300">wintun.dll</span>
+                  {binaries.wintunFound ? (
+                    <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-300">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-white" /> Ready
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[9px] font-semibold text-zinc-500">
+                      <XCircle className="w-2.5 h-2.5 text-zinc-500" /> Missing
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {binariesUpdateError && (
+              <div className="p-2 bg-red-950/40 border border-red-900/60 rounded-lg text-[10px] text-red-300 flex items-start gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                <span className="break-all">{binariesUpdateError}</span>
+              </div>
+            )}
+
+            {/* Live Update Progress Indicator */}
+            {updatingBinaries && binariesUpdateProgress && (
+              <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-medium text-zinc-300 flex items-center gap-1.5">
+                    <RotateCw className="w-3 h-3 animate-spin text-white" />
+                    {binariesUpdateProgress.message}
+                  </span>
+                  <span className="font-mono font-bold text-white">
+                    {binariesUpdateProgress.currentPercent}%
+                  </span>
+                </div>
+                <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-white h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.max(5, Math.min(100, binariesUpdateProgress.currentPercent))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* One-Click In-App Core Update Button */}
+            {onUpdateCoreBinaries && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => onUpdateCoreBinaries()}
+                  disabled={updatingBinaries || checkingBinariesUpdate}
+                  className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                    binariesUpdateInfo?.hasUpdate || !binaries.ready
+                      ? "bg-white hover:bg-zinc-200 text-black cursor-pointer"
+                      : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700"
+                  } disabled:opacity-50`}
+                >
+                  {updatingBinaries ? (
+                    <>
+                      <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                      Updating Engine Binaries...
+                    </>
+                  ) : binariesUpdateInfo?.hasUpdate ? (
+                    <>
+                      <ArrowDownToLine className="w-3.5 h-3.5" />
+                      Update Core Binaries In-Place
+                    </>
+                  ) : !binaries.ready ? (
+                    <>
+                      <Download className="w-3.5 h-3.5" />
+                      Download Missing Engine Binaries
+                    </>
+                  ) : (
+                    <>
+                      <RotateCw className="w-3.5 h-3.5" />
+                      Reinstall / Refresh Core Binaries
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

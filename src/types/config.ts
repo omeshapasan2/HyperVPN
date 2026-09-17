@@ -132,6 +132,35 @@ export interface UpdateCheckResult {
   publishedAt: string;
 }
 
+export interface BinaryItemStatus {
+  name: string;
+  description: string;
+  currentVersion: string | null;
+  latestVersion: string;
+  exists: boolean;
+  path: string | null;
+  hasUpdate: boolean;
+  sizeBytes: number | null;
+  sha256: string | null;
+  url: string;
+}
+
+export interface BinariesUpdateCheckResult {
+  hasUpdate: boolean;
+  manifestVersion: string;
+  binaries: BinaryItemStatus[];
+  checkTime: string;
+}
+
+export interface BinaryUpdateProgress {
+  stage: "checking" | "downloading" | "extracting" | "verifying" | "installing" | "reconnecting" | "complete" | "error";
+  currentItem: string;
+  currentPercent: number;
+  message: string;
+  totalItems: number;
+  completedItems: number;
+}
+
 export interface LogEntry {
   id: string;
   source: "xray" | "tun2socks" | "system";

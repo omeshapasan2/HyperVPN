@@ -56,6 +56,10 @@ impl ProcessManager {
         xray_alive && tun_alive
     }
 
+    pub fn get_active_config(&self) -> Option<VlessConfig> {
+        self.active_config.lock().unwrap().clone()
+    }
+
     pub fn get_active_config_id(&self) -> Option<String> {
         self.active_config.lock().unwrap().as_ref().map(|c| c.id.clone())
     }
@@ -122,7 +126,15 @@ impl ProcessManager {
 
     /// Finds the path to a sidecar binary (e.g. "xray.exe", "tun2socks.exe", "wintun.dll", "WebView2Loader.dll")
     pub fn find_binary_path(&self, binary_name: &str) -> Option<PathBuf> {
-        // Check alongside current executable
+        // 1. Check AppData directory first (where in-app updated binaries are stored)
+        if let Some(app_data) = dirs_next::data_dir() {
+            let app_dir = app_data.join("com.hypervpn.app").join("bin").join(binary_name);
+            if app_dir.exists() {
+                return Some(app_dir);
+            }
+        }
+
+        // 2. Check alongside current executable (bundled installation)
         if let Ok(current_exe) = std::env::current_exe() {
             if let Some(parent) = current_exe.parent() {
                 let candidate = parent.join(binary_name);
@@ -136,7 +148,7 @@ impl ProcessManager {
             }
         }
 
-        // Check relative development path
+        // 3. Check relative development path
         let dev_paths = [
             PathBuf::from(format!("src-tauri/binaries/{}", binary_name)),
             PathBuf::from(format!("binaries/{}", binary_name)),
@@ -149,14 +161,6 @@ impl ProcessManager {
                     return Some(abs);
                 }
                 return Some(path.clone());
-            }
-        }
-
-        // Check AppData directory
-        if let Some(app_data) = dirs_next::data_dir() {
-            let app_dir = app_data.join("com.hypervpn.app").join("bin").join(binary_name);
-            if app_dir.exists() {
-                return Some(app_dir);
             }
         }
 

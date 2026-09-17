@@ -40,6 +40,22 @@ export function useVpn(configs: VlessConfig[] = [], activeConfigId: string | nul
       setConnecting(true);
       setErrorMessage(null);
       try {
+        if (typeof window !== "undefined" && !(window as any).__TAURI_INTERNALS__) {
+          // Browser preview mock mode
+          await new Promise((r) => setTimeout(r, 600));
+          setStatus({
+            connected: true,
+            activeConfigId: configToConnect.id,
+            connecting: false,
+            uptimeSeconds: 14,
+            sessionBytesUplink: 1024 * 512,
+            sessionBytesDownlink: 1024 * 1024 * 8,
+            currentUploadSpeed: 840 * 1024,
+            currentDownloadSpeed: 4.8 * 1024 * 1024,
+            error: null,
+          });
+          return;
+        }
         await invoke("connect_vpn", { config: configToConnect });
         await refreshStatus();
       } catch (err) {
@@ -58,6 +74,12 @@ export function useVpn(configs: VlessConfig[] = [], activeConfigId: string | nul
     setConnecting(true);
     setErrorMessage(null);
     try {
+      if (typeof window !== "undefined" && !(window as any).__TAURI_INTERNALS__) {
+        // Browser preview mock mode
+        await new Promise((r) => setTimeout(r, 400));
+        setStatus(initialStatus);
+        return;
+      }
       await invoke("disconnect_vpn");
       await refreshStatus();
     } catch (err) {

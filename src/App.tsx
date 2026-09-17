@@ -70,10 +70,17 @@ export function App() {
     updateInfo,
     checkingUpdate,
     updateError,
+    binariesUpdateInfo,
+    checkingBinariesUpdate,
+    binariesUpdateProgress,
+    updatingBinaries,
+    binariesUpdateError,
     saveSettings,
     checkBinaries,
     relaunchAsAdmin,
     checkForUpdates,
+    checkCoreBinariesUpdates,
+    updateCoreBinaries,
   } = useSettings();
   const { logs, clearLogs, refreshLogs } = useLogs();
 
@@ -157,10 +164,17 @@ export function App() {
               updateInfo={updateInfo}
               checkingUpdate={checkingUpdate}
               updateError={updateError}
+              binariesUpdateInfo={binariesUpdateInfo}
+              checkingBinariesUpdate={checkingBinariesUpdate}
+              binariesUpdateProgress={binariesUpdateProgress}
+              updatingBinaries={updatingBinaries}
+              binariesUpdateError={binariesUpdateError}
               onSaveSettings={saveSettings}
               onCheckBinaries={checkBinaries}
               onRelaunchAsAdmin={relaunchAsAdmin}
               onCheckForUpdates={checkForUpdates}
+              onCheckCoreBinariesUpdates={checkCoreBinariesUpdates}
+              onUpdateCoreBinaries={updateCoreBinaries}
             />
           )}
 
