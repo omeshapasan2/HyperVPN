@@ -278,11 +278,6 @@ impl ProcessManager {
             "warning",
             "--udp-timeout",
             "1m",
-            "--tcp-auto-tuning",
-            "--tcp-sndbuf",
-            "2m",
-            "--tcp-rcvbuf",
-            "2m",
         ]);
         tun_cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 

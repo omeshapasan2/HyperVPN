@@ -257,10 +257,9 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
         },
         "dns": {
             "servers": [
-                "https://1.1.1.1/dns-query",
-                "https://8.8.8.8/dns-query",
                 "1.1.1.1",
-                "8.8.8.8"
+                "8.8.8.8",
+                "https://1.1.1.1/dns-query"
             ],
             "queryStrategy": "UseIPv4"
         },
@@ -271,7 +270,6 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
                     "connIdle": 300,
                     "uplinkOnly": 2,
                     "downlinkOnly": 5,
-                    "bufferSize": 10240,
                     "statsUserUplink": true,
                     "statsUserDownlink": true
                 }
@@ -327,10 +325,6 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
                 "streamSettings": stream_settings
             },
             {
-                "tag": "dns-out",
-                "protocol": "dns"
-            },
-            {
                 "tag": "direct",
                 "protocol": "freedom"
             },
@@ -351,7 +345,7 @@ pub fn generate_xray_config(config: &VlessConfig, socks_port: u16, stats_port: u
                     "type": "field",
                     "port": "53",
                     "network": "udp,tcp",
-                    "outboundTag": "dns-out"
+                    "outboundTag": "proxy"
                 },
                 {
                     "type": "field",
