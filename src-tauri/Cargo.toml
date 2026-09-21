@@ -1,6 +1,6 @@
 [package]
 name = "hypervpn"
-version = "2.0.8"
+version = "2.0.9"
 description = "HyperVPN - Fast, native VLESS desktop VPN client for Windows"
 authors = ["HyperVPN Team"]
 edition = "2021"
