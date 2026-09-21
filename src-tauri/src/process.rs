@@ -30,6 +30,7 @@ pub struct ProcessManager {
     tun2socks_child: Mutex<Option<Child>>,
     active_config: Mutex<Option<VlessConfig>>,
     connected_at: Mutex<Option<Instant>>,
+    active_custom_exclusions: Mutex<Vec<String>>,
     logs: Mutex<VecDeque<ProcessLogEntry>>,
     app_handle: Mutex<Option<AppHandle>>,
 }
@@ -41,6 +42,7 @@ impl ProcessManager {
             tun2socks_child: Mutex::new(None),
             active_config: Mutex::new(None),
             connected_at: Mutex::new(None),
+            active_custom_exclusions: Mutex::new(Vec::new()),
             logs: Mutex::new(VecDeque::with_capacity(300)),
             app_handle: Mutex::new(None),
         }
@@ -113,7 +115,9 @@ impl ProcessManager {
             *self.connected_at.lock().unwrap() = None;
             let active_cfg = self.active_config.lock().unwrap().take();
             let host = active_cfg.as_ref().map(|c| c.host.as_str()).unwrap_or("");
-            let _ = crate::routing::cleanup_tun_routes(host, &[]);
+            let exclusions = self.active_custom_exclusions.lock().unwrap().clone();
+            let _ = crate::routing::cleanup_tun_routes(host, &exclusions);
+            self.active_custom_exclusions.lock().unwrap().clear();
 
             if let Ok(guard) = self.app_handle.lock() {
                 if let Some(ref handle) = *guard {
@@ -363,6 +367,8 @@ impl ProcessManager {
         *self.active_config.lock().unwrap() = Some(config.clone());
         *self.connected_at.lock().unwrap() = Some(Instant::now());
 
+        *self.active_custom_exclusions.lock().unwrap() = custom_exclusions;
+
         self.add_log("system", "info", "HyperVPN successfully connected in system-wide TUN mode.");
 
         if let Ok(guard) = self.app_handle.lock() {
@@ -382,7 +388,9 @@ impl ProcessManager {
         // 1. Clean up routing first
         let active_cfg = self.active_config.lock().unwrap().take();
         let host = active_cfg.as_ref().map(|c| c.host.as_str()).unwrap_or("");
-        let _ = cleanup_tun_routes(host, &[]);
+        let exclusions = self.active_custom_exclusions.lock().unwrap().clone();
+        let _ = cleanup_tun_routes(host, &exclusions);
+        self.active_custom_exclusions.lock().unwrap().clear();
 
         // 2. Kill tun2socks bridge first
         if let Some(mut child) = self.tun2socks_child.lock().unwrap().take() {
