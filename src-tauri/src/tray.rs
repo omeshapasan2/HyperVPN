@@ -11,9 +11,16 @@ pub struct TrayMenuState<R: Runtime> {
     pub show_hide_item: MenuItem<R>,
 }
 
+/// Checks whether the main webview window is currently open and visible.
+pub fn is_main_window_visible<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.get_webview_window("main")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false)
+}
+
 /// Updates the tray icon status label, toggle label, show/hide label, and tooltip.
 pub fn update_tray_menu<R: Runtime>(app: &AppHandle<R>) {
-    let window_exists = app.get_webview_window("main").is_some();
+    let window_visible = is_main_window_visible(app);
 
     let (connected, remark) = if let Some(state) = app.try_state::<crate::AppState>() {
         let connected = state.process_manager.is_connected();
@@ -34,7 +41,7 @@ pub fn update_tray_menu<R: Runtime>(app: &AppHandle<R>) {
             "HyperVPN: Disconnected".to_string()
         };
         let toggle_text = if connected { "Disconnect" } else { "Connect" };
-        let show_hide_text = if window_exists {
+        let show_hide_text = if window_visible {
             "Hide HyperVPN"
         } else {
             "Show HyperVPN"
@@ -100,6 +107,7 @@ pub fn show_or_create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), 
             }
         };
         let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
     }
 
@@ -107,10 +115,10 @@ pub fn show_or_create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), 
     Ok(())
 }
 
-/// Destroys the main webview window and updates the tray menu.
+/// Hides or destroys the main webview window and updates the tray menu.
 pub fn destroy_main_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
-        let _ = window.destroy();
+        let _ = window.hide();
     }
     update_tray_menu(app);
 }
@@ -146,18 +154,21 @@ pub fn setup_system_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn s
         .tooltip("HyperVPN - Fast Native VLESS Client")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show_hide_window" => {
-                if app.get_webview_window("main").is_some() {
-                    destroy_main_window(app);
+                if is_main_window_visible(app) {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                    update_tray_menu(app);
                 } else {
                     let _ = show_or_create_main_window(app);
                 }
             }
             "toggle_vpn" => {
-                if app.get_webview_window("main").is_some() {
-                    // Window exists, emit event so UI can display any notifications/state
+                if is_main_window_visible(app) {
+                    // Window exists and is visible, emit event so UI can display any notifications/state
                     let _ = app.emit("tray-toggle-vpn", ());
                 } else if let Some(state) = app.try_state::<crate::AppState>() {
-                    // Headless toggle from tray when webview is destroyed
+                    // Headless toggle from tray when webview is hidden
                     let pm = Arc::clone(&state.process_manager);
                     let sm = Arc::clone(&state.storage_manager);
                     let data_dir = state.data_dir.clone();
@@ -213,13 +224,7 @@ pub fn setup_system_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn s
             } = event
             {
                 let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
-                } else {
-                    let _ = show_or_create_main_window(app);
-                }
+                let _ = show_or_create_main_window(app);
             }
         })
         .build(app)?;

@@ -12,3 +12,9 @@
   IfFileExists "$INSTDIR\resources\binaries\wintun.dll" 0 +2
     CopyFiles /SILENT "$INSTDIR\resources\binaries\wintun.dll" "$INSTDIR\wintun.dll"
 !macroend
+
+!macro NSIS_HOOK_PREUNINSTALL
+  DetailPrint "Cleaning up HyperVPN autostart scheduled task..."
+  nsExec::Exec 'schtasks /delete /tn "HyperVPNAutostart" /f'
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "HyperVPN"
+!macroend

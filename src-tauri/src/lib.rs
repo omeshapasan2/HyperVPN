@@ -197,7 +197,10 @@ fn get_app_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
 
 #[tauri::command]
 fn save_app_settings(settings: AppSettings, state: State<'_, AppState>) -> Result<(), String> {
-    state.storage_manager.save_settings(settings)
+    let auto_start = settings.auto_start;
+    state.storage_manager.save_settings(settings)?;
+    let _ = set_windows_autostart(auto_start);
+    Ok(())
 }
 
 #[tauri::command]
@@ -319,23 +322,125 @@ fn set_windows_autostart(enabled: bool) -> Result<(), String> {
         let exe_str = exe.to_string_lossy().to_string();
 
         if enabled {
-            let val = format!("\"{}\" --autostart", exe_str);
+            // Because HyperVPN requires Administrator privileges (requireAdministrator manifest),
+            // standard HKCU Run registry keys are silently ignored by Windows at startup.
+            // We configure Windows Task Scheduler with HighestAvailable execution level and
+            // ensure battery start is allowed for laptops.
+            let xml_content = format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>HyperVPN Autostart on User Logon</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>{}</Command>
+      <Arguments>--autostart</Arguments>
+    </Exec>
+  </Actions>
+</Task>"#,
+                exe_str
+            );
+
+            let temp_xml_path = std::env::temp_dir().join("hypervpn_autostart_task.xml");
+            let mut task_created = false;
+
+            if let Ok(_) = std::fs::write(&temp_xml_path, xml_content.as_bytes()) {
+                let xml_path_str = temp_xml_path.to_string_lossy().to_string();
+                let output = std::process::Command::new("schtasks")
+                    .args(&[
+                        "/create",
+                        "/tn",
+                        "HyperVPNAutostart",
+                        "/xml",
+                        &xml_path_str,
+                        "/f",
+                    ])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+
+                if let Ok(out) = output {
+                    if out.status.success() {
+                        task_created = true;
+                    }
+                }
+                let _ = std::fs::remove_file(&temp_xml_path);
+            }
+
+            // Fallback to schtasks /create if XML method was not successful
+            if !task_created {
+                let tr_arg = format!("\"{}\" --autostart", exe_str);
+                let _ = std::process::Command::new("schtasks")
+                    .args(&[
+                        "/create",
+                        "/tn",
+                        "HyperVPNAutostart",
+                        "/tr",
+                        &tr_arg,
+                        "/sc",
+                        "onlogon",
+                        "/rl",
+                        "highest",
+                        "/f",
+                    ])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+            }
+
+            // Clean up any legacy registry run key entry to prevent duplicate/broken triggers
             let _ = std::process::Command::new("reg")
                 .args(&[
-                    "add",
+                    "delete",
                     "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
                     "/v",
                     "HyperVPN",
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    &val,
                     "/f",
                 ])
                 .creation_flags(CREATE_NO_WINDOW)
-                .output()
-                .map_err(|e| format!("Failed to set autostart registry: {}", e))?;
+                .output();
         } else {
+            // Delete Scheduled Task
+            let _ = std::process::Command::new("schtasks")
+                .args(&[
+                    "/delete",
+                    "/tn",
+                    "HyperVPNAutostart",
+                    "/f",
+                ])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+
+            // Also delete legacy registry key
             let _ = std::process::Command::new("reg")
                 .args(&[
                     "delete",
@@ -357,7 +462,28 @@ fn get_windows_autostart() -> Result<bool, String> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
-        let output = std::process::Command::new("reg")
+
+        // 1. Check Task Scheduler
+        let output = std::process::Command::new("schtasks")
+            .args(&[
+                "/query",
+                "/tn",
+                "HyperVPNAutostart",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+
+        if let Ok(out) = output {
+            if out.status.success() {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                if !stdout.contains("ERROR:") {
+                    return Ok(true);
+                }
+            }
+        }
+
+        // 2. Fallback check HKCU Run key
+        let reg_output = std::process::Command::new("reg")
             .args(&[
                 "query",
                 "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -366,8 +492,11 @@ fn get_windows_autostart() -> Result<bool, String> {
             ])
             .creation_flags(CREATE_NO_WINDOW)
             .output();
-        if let Ok(out) = output {
-            return Ok(out.status.success());
+
+        if let Ok(out) = reg_output {
+            if out.status.success() {
+                return Ok(true);
+            }
         }
     }
     Ok(false)
@@ -1011,12 +1140,19 @@ pub fn run() {
             // Provide app handle to ProcessManager for event emission
             pm_clone.set_app_handle(app.handle().clone());
 
-            // Handle --autostart flag: destroy window on launch to start headless in tray
+            // Handle --autostart flag: hide window on launch to start in tray
             let is_autostart = std::env::args().any(|a| a == "--autostart");
             if is_autostart {
                 if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.destroy();
+                    let _ = w.hide();
                 }
+                tray::update_tray_menu(app.handle());
+            }
+
+            // Ensure Windows Task Scheduler autostart is in sync with saved settings
+            let settings = sm_clone.get_settings();
+            if settings.auto_start {
+                let _ = set_windows_autostart(true);
             }
 
             // Spawn background timer to poll Xray Stats API every 1 second
@@ -1033,7 +1169,6 @@ pub fn run() {
             });
 
             // Check auto-connect on launch
-            let settings = sm_clone.get_settings();
             if settings.auto_connect_on_launch {
                 let configs = sm_clone.get_configs();
                 if let Some(first) = configs.first() {
@@ -1067,7 +1202,7 @@ pub fn run() {
                         let settings = state.storage_manager.get_settings();
                         if settings.minimize_to_tray_on_close {
                             api.prevent_close();
-                            let _ = window.destroy();
+                            let _ = window.hide();
                             tray::update_tray_menu(app);
                         }
                     }

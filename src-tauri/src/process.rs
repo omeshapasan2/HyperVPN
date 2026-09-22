@@ -284,7 +284,7 @@ impl ProcessManager {
             "1420",
             "--tcp-auto-tuning",
             "--udp-timeout",
-            "1m",
+            "10s",
         ]);
         tun_cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 

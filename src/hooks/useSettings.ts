@@ -74,17 +74,17 @@ export function useSettings() {
   const fetchSettings = useCallback(async () => {
     try {
       const saved = await invoke<AppSettings>("get_app_settings");
-      // Check OS autostart state
+      // Check OS autostart state (Task Scheduler on Windows for elevated UAC compatibility)
       try {
-        const autostartActive = await isEnabled();
+        const autostartActive = await invoke<boolean>("get_windows_autostart");
         saved.autoStart = autostartActive;
       } catch {
-        // Fallback to direct registry check on Windows
+        // Fallback to tauri plugin check
         try {
-          const regActive = await invoke<boolean>("get_windows_autostart");
-          saved.autoStart = regActive;
+          const pluginActive = await isEnabled();
+          saved.autoStart = pluginActive;
         } catch {
-          // Keep saved
+          // Keep saved from storage
         }
       }
       setSettings(saved);
@@ -350,7 +350,14 @@ export function useSettings() {
     try {
       await invoke("save_app_settings", { settings: newSettings });
 
-      // Handle autostart toggle via plugin and registry
+      // Ensure Windows Task Scheduler autostart is synchronized
+      try {
+        await invoke("set_windows_autostart", { enabled: newSettings.autoStart });
+      } catch (err) {
+        console.warn("set_windows_autostart error:", err);
+      }
+
+      // Also sync plugin state if available
       try {
         if (newSettings.autoStart) {
           await enable();
@@ -358,8 +365,7 @@ export function useSettings() {
           await disable();
         }
       } catch {
-        // Direct registry fallback
-        await invoke("set_windows_autostart", { enabled: newSettings.autoStart }).catch(() => {});
+        // Ignore plugin fallback errors
       }
     } catch (err) {
       console.error("Failed to save settings:", err);
